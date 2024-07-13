@@ -7,7 +7,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "ultraLog",
+    "productName": "ultralog",
     "version": "0.1.0"
   },
   "tauri": {
@@ -56,10 +56,10 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
+        "height": 1080,
         "resizable": true,
         "title": "Ultra Log",
-        "width": 800
+        "width": 1920
       }
     ]
   }
