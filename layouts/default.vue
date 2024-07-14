@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import type { ECU_TYPES } from '~/types';
   const { isHelpSlideoverOpen } = useDashboard();
   // const { isDashboardSearchModalOpen } = useUIState();
   // const { metaSymbol } = useShortcuts();
@@ -41,7 +40,7 @@
 
 <template>
   <UDashboardLayout>
-    <UDashboardPanel :width="250" :resizable="{ min: 200, max: 300 }" collapsible>
+    <UDashboardPanel :width="300" :resizable="{ min: 200, max: 400 }" collapsible>
       <UDashboardNavbar class="!border-transparent" :ui="{ left: 'flex-1' }">
         <template #left>
           <UIcon name="i-heroicons-chart-bar" class="pt-2" />
@@ -57,9 +56,10 @@
 
         <UDivider />
 
-        <SidebarCsvItem fileName="HaltechLog.csv" ecu="Haltech" />
-        <SidebarCsvItem fileName="LinkLog.csv" ecu="Link" />
+        <SidebarCsvItem fileName="HaltechLog.csv" ecu="haltech" />
+        <SidebarCsvItem fileName="LinkLog.csv" ecu="link" />
 
+        <UInput type="file" size="md" icon="i-heroicons-folder" placeholder="test" />
         <div class="flex-1" />
 
         <UDivider class="sticky bottom-0" />

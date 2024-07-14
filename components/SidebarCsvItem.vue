@@ -11,7 +11,7 @@
     ecu: {
       type: String as PropType<ECU_TYPES>,
       required: true,
-      default: 'Haltech',
+      default: 'other',
     },
   });
 </script>
@@ -20,22 +20,21 @@
   <UDashboardCard :title="fileName" icon="i-heroicons-document-text">
     <template #description>
       <div class="flex items">
-        <UBadge v-if="ecu === 'Haltech'" color="yellow" variant="solid">Haltech</UBadge>
-        <UBadge v-if="ecu === 'Link'" color="red" variant="solid">Link</UBadge>
+        <UBadge :class="'bg-' + ecu" variant="solid">{{ ecu }}</UBadge>
       </div>
     </template>
-    <template #footer>
+    <!-- <template #footer>
       <div class="flex items-center justify-between">
         <span class="text-sm text-gray-500 dark:text-gray-400">Updated 2 days ago</span>
         <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-gray-500 dark:text-gray-400" />
       </div>
-    </template>
+    </template> -->
   </UDashboardCard>
 </template>
 
 <style lang="scss" scoped>
   .i-heroicons-document-text {
-    width: 1.7rem !important;
-    height: 1.7rem !important;
+    width: 1.2rem !important;
+    height: 1.2rem !important;
   }
 </style>

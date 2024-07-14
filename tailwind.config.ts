@@ -7,6 +7,11 @@ export default <Partial<Config>>{
       fontFamily: {
         sans: ['DM Sans', ...defaultTheme.fontFamily.sans],
       },
+      colors: {
+        haltech: '#F5C147',
+        linkecu: '#3A1B4E',
+        maxx: '#DA4D32',
+      },
     },
   },
 };
