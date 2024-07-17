@@ -27,6 +27,7 @@ pub enum ChannelType {
   EngineVolume,
   Flow,
   Frequency,
+  #[strum(serialize = "FuelEcomony")]
   FuelEconomy,
   FuelVolume,
   Gear,
@@ -43,7 +44,6 @@ pub enum ChannelType {
   Percentage,
   Pressure,
   PulsesPerLongDistance,
-  TimeSeconds,
   Ratio,
   Raw,
   Resistance,
@@ -58,6 +58,8 @@ pub enum ChannelType {
   TimeMillisecondsAsSeconds,
   #[strum(serialize = "Time_ms")]
   TimeMilliseconds,
+  #[strum(serialize = "Time_s")]
+  TimeSeconds,
 }
 
 impl Default for ChannelType {
@@ -68,7 +70,7 @@ impl Default for ChannelType {
 pub enum ChannelValue {
   _Bool(bool),
   _Float(f64),
-  _Int(i64),
+  Int(i64),
   String(String),
 }
 
@@ -120,6 +122,9 @@ impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
           "Log Source" => meta.log_source = value,
           "Log Number" => meta.log_number = value,
           "Log" => meta.log_date_time = value,
+          // The "Channel" key indicates the start of a new channel
+          // so this assumes the previous channel is complete and adds it to
+          // the list
           "Channel" => {
             if !current_channel.name.is_empty() {
               channels.push(current_channel);
@@ -129,7 +134,13 @@ impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
             current_channel.name = value;
           }
           "Id" => current_channel.id = value,
-          "Type" => current_channel.r#type = ChannelType::from_str(&value).unwrap(),
+          "Type" => {
+            if let Ok(channel_type) = ChannelType::from_str(&value) {
+              current_channel.r#type = channel_type;
+            } else {
+              eprintln!("Failed to parse channel type: {}", value);
+            }
+          }
           "DisplayMaxMin" => {
             let values: Vec<&str> = value.split(",").collect();
             current_channel.display_max = values[0].parse().ok();
@@ -139,6 +150,13 @@ impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
         }
       } else {
         // This is not a key-value pair, so it must be channel data (CSV)
+        //
+        // If `current_channel` is not empty, add it to the list of channels
+        if !current_channel.name.is_empty() {
+          channels.push(current_channel);
+          current_channel = Channel::default();
+        }
+
         if !line.is_empty() {
           let values = line
             .split(",")
@@ -151,7 +169,7 @@ impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
 
               let channel_type = &channels[i - 1].r#type;
               match channel_type {
-                _ => ChannelValue::String(v.to_string())
+                _ => ChannelValue::Int(v.parse().unwrap()),
               }
             })
             .collect::<Vec<_>>();
