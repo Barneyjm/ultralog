@@ -185,8 +185,4 @@ impl Parseable for Haltech {
       data,
     })
   }
-
-  fn get_channel(&self, channel_name: String) -> Result<Vec<ChannelValue>, Box<dyn Error>> {
-    Ok(vec![])
-  }
 }

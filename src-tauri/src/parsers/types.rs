@@ -7,6 +7,13 @@ use super::haltech::{HaltechChannel, HaltechMeta};
 #[derive(Clone, Debug, Serialize)]
 pub enum Meta {
   Haltech(HaltechMeta),
+  Empty,
+}
+
+impl Default for Meta {
+  fn default() -> Self {
+    Meta::Empty
+  }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -14,15 +21,23 @@ pub enum Channel {
   Haltech(HaltechChannel),
 }
 
+impl Channel {
+  pub fn name(&self) -> String {
+    match self {
+      Channel::Haltech(h) => h.name.clone(),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub enum ChannelValue {
   _Bool(bool),
   _Float(f64),
   Int(i64),
-  String(String),
+  _String(String),
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct Log {
   pub meta: Meta,
   pub channels: Vec<Channel>,
@@ -32,5 +47,4 @@ pub struct Log {
 
 pub trait Parseable {
   fn parse(&self, data: &str) -> Result<Log, Box<dyn Error>>;
-  fn get_channel(&self, channel_name: String) -> Result<Vec<ChannelValue>, Box<dyn Error>>;
 }
