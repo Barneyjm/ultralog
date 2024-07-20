@@ -1,10 +1,13 @@
+use std::error::Error;
 use std::str::FromStr;
 
 use regex::Regex;
 use serde::Serialize;
 use strum::{AsRefStr, EnumString};
 
-use crate::parsers::types::{Log, Parser};
+use crate::parsers::types::{Log, Parseable};
+
+use super::types::{Channel, ChannelValue, Meta};
 
 #[derive(AsRefStr, Clone, Debug, EnumString, Serialize)]
 pub enum ChannelType {
@@ -66,16 +69,8 @@ impl Default for ChannelType {
   fn default() -> Self { ChannelType::Raw }
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub enum ChannelValue {
-  _Bool(bool),
-  _Float(f64),
-  Int(i64),
-  String(String),
-}
-
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct Meta {
+pub struct HaltechMeta {
   pub data_log_version: String,
   pub software: String,
   pub software_version: String,
@@ -86,7 +81,7 @@ pub struct Meta {
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct Channel {
+pub struct HaltechChannel {
   pub name: String,
   pub id: String,
   pub r#type: ChannelType,
@@ -96,16 +91,17 @@ pub struct Channel {
 
 pub struct Haltech {}
 
-impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
-  fn parse(&self, file_contents: &str) -> Result<Log<Meta, Channel, Vec<ChannelValue>>, Box<dyn std::error::Error>> {
-    let mut meta = Meta::default();
+impl Parseable for Haltech {
+  fn parse(&self, file_contents: &str) -> Result<Log, Box<dyn Error>> {
+    let mut meta = HaltechMeta::default();
     let mut channels = vec![];
+    let mut times = vec![];
     let mut data = vec![];
 
     let regex = Regex::new(r"(?<name>.+) : (?<value>.+)")
       .expect("Failed to compile regex");
 
-    let mut current_channel = Channel::default();
+    let mut current_channel = HaltechChannel::default();
     for line in file_contents.lines() {
       let line = line.trim();
 
@@ -127,10 +123,10 @@ impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
           // the list
           "Channel" => {
             if !current_channel.name.is_empty() {
-              channels.push(current_channel);
+              channels.push(Channel::Haltech(current_channel));
             }
 
-            current_channel = Channel::default();
+            current_channel = HaltechChannel::default();
             current_channel.name = value;
           }
           "Id" => current_channel.id = value,
@@ -153,23 +149,24 @@ impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
         //
         // If `current_channel` is not empty, add it to the list of channels
         if !current_channel.name.is_empty() {
-          channels.push(current_channel);
-          current_channel = Channel::default();
+          channels.push(Channel::Haltech(current_channel));
+          current_channel = HaltechChannel::default();
         }
 
         if !line.is_empty() {
           let values = line
             .split(",")
             .enumerate()
-            .map(|(i, v)| {
+            .filter_map(|(i, v)| {
               // The first value is always a timestamp
               if i == 0 {
-                return ChannelValue::String(v.to_string());
+                times.push(v.to_string());
+                return None;
               }
 
-              let channel_type = &channels[i - 1].r#type;
-              match channel_type {
-                _ => ChannelValue::Int(v.parse().unwrap()),
+              let Channel::Haltech(channel) = &channels[i - 1];
+              match channel.r#type {
+                _ => Some(ChannelValue::Int(v.parse().unwrap())),
               }
             })
             .collect::<Vec<_>>();
@@ -182,9 +179,14 @@ impl Parser<Meta, Channel, Vec<ChannelValue>> for Haltech {
     }
 
     Ok(Log {
-      meta,
+      meta: Meta::Haltech(meta),
       channels,
+      times,
       data,
     })
+  }
+
+  fn get_channel(&self, channel_name: String) -> Result<Vec<ChannelValue>, Box<dyn Error>> {
+    Ok(vec![])
   }
 }
