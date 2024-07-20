@@ -7,7 +7,7 @@ use strum::{AsRefStr, EnumString};
 
 use crate::parsers::types::{Log, Parseable};
 
-use super::types::{Channel, ChannelValue, Meta};
+use super::types::{Channel, Value, Meta};
 
 #[derive(AsRefStr, Clone, Debug, EnumString, Serialize)]
 pub enum ChannelType {
@@ -129,7 +129,7 @@ impl Parseable for Haltech {
             current_channel = HaltechChannel::default();
             current_channel.name = value;
           }
-          "Id" => current_channel.id = value,
+          "ID" => current_channel.id = value,
           "Type" => {
             if let Ok(channel_type) = ChannelType::from_str(&value) {
               current_channel.r#type = channel_type;
@@ -166,7 +166,7 @@ impl Parseable for Haltech {
 
               let Channel::Haltech(channel) = &channels[i - 1];
               match channel.r#type {
-                _ => Some(ChannelValue::Int(v.parse().unwrap())),
+                _ => Some(Value::Int(v.parse().unwrap())),
               }
             })
             .collect::<Vec<_>>();

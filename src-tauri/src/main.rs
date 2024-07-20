@@ -9,14 +9,14 @@ use tauri::State;
 
 mod parsers;
 
-use parsers::types::{Channel, ChannelValue, Log, Parseable};
+use parsers::types::{Channel, Value, Log, Parseable};
 
 fn main() {
-    tauri::Builder::default()
-      .manage(Store::default())
-      .invoke_handler(tauri::generate_handler![add_file, get_channel_data])
-      .run(tauri::generate_context!())
-      .expect("error while running tauri application");
+  tauri::Builder::default()
+    .manage(Store::default())
+    .invoke_handler(tauri::generate_handler![add_file, get_channel_data])
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application");
 }
 
 #[derive(Default)]
@@ -49,7 +49,7 @@ fn add_file(file_path: String, store: State<Store>) -> Result<Vec<Channel>, Stri
 }
 
 #[tauri::command]
-fn get_channel_data(channel_name: String, store: State<Store>) -> Result<Vec<ChannelValue>, String> {
+fn get_channel_data(channel_name: String, store: State<Store>) -> Result<Vec<Value>, String> {
   let log = store.log.lock().unwrap();
 
   // Finds the channel index

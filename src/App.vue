@@ -24,9 +24,8 @@
   const dropHandler = async (event: Event<string[]>) => {
     loading.value = true;
     const [filePath] = event.payload;
-    const rawChannels: { Haltech: LogChannel }[] = await invoke('add_file', { filePath });
+    channels.value = await invoke('add_file', { filePath });
 
-    channels.value = rawChannels.map((channel) => channel.Haltech);
     channelToAdd.value = channels.value[0].name;
     loading.value = false;
   }
