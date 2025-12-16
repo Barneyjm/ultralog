@@ -109,8 +109,7 @@ impl UltraLogApp {
     fn remove_file(&mut self, index: usize) {
         if index < self.files.len() {
             // Remove any selected channels from this file
-            self.selected_channels
-                .retain(|c| c.file_index != index);
+            self.selected_channels.retain(|c| c.file_index != index);
 
             // Update file indices for remaining channels
             for channel in &mut self.selected_channels {
@@ -207,8 +206,8 @@ impl UltraLogApp {
                     self.selected_file = Some(i);
                 }
 
-                // Delete button
-                if ui.small_button("\u{2715}").clicked() {
+                // Delete button - use text instead of unicode
+                if ui.small_button("x").clicked() {
                     file_to_remove = Some(i);
                 }
             });
@@ -236,7 +235,7 @@ impl UltraLogApp {
         }
     }
 
-    /// Render channel selection panel
+    /// Render channel selection panel - fills available space
     fn render_channel_selection(&mut self, ui: &mut egui::Ui) {
         ui.heading("Channels");
         ui.separator();
@@ -247,25 +246,29 @@ impl UltraLogApp {
             // Search box
             ui.horizontal(|ui| {
                 ui.label("Search:");
-                ui.text_edit_singleline(&mut self.channel_search);
+                ui.add(egui::TextEdit::singleline(&mut self.channel_search).desired_width(f32::INFINITY));
             });
 
             ui.add_space(5.0);
 
             // Channel count
             ui.label(format!(
-                "Selected: {} / {}",
+                "Selected: {} / {} | Total: {}",
                 self.selected_channels.len(),
-                MAX_CHANNELS
+                MAX_CHANNELS,
+                file.log.channels.len()
             ));
 
             ui.separator();
 
-            // Channel list (scrollable)
+            // Channel list - use all remaining vertical space
+            let search_lower = self.channel_search.to_lowercase();
+            let mut channel_to_add: Option<(usize, usize)> = None;
+
             egui::ScrollArea::vertical()
-                .max_height(200.0)
+                .auto_shrink([false, false])  // Don't shrink - fill available space
                 .show(ui, |ui| {
-                    let search_lower = self.channel_search.to_lowercase();
+                    ui.set_width(ui.available_width());  // Fill width
 
                     for (channel_index, channel) in file.log.channels.iter().enumerate() {
                         let name = channel.name();
@@ -283,23 +286,33 @@ impl UltraLogApp {
                             .iter()
                             .any(|c| c.file_index == file_index && c.channel_index == channel_index);
 
-                        ui.horizontal(|ui| {
-                            if is_selected {
-                                ui.label(
-                                    egui::RichText::new("\u{2713}")
-                                        .color(egui::Color32::from_rgb(113, 120, 78)),
-                                );
-                            }
-                            ui.label(&name);
-                        });
+                        // Build the label with checkmark prefix if selected
+                        let label_text = if is_selected {
+                            format!("[*] {}", name)
+                        } else {
+                            format!("[ ] {}", name)
+                        };
+
+                        let response = ui.selectable_label(is_selected, label_text);
+
+                        if response.clicked() && !is_selected {
+                            channel_to_add = Some((file_index, channel_index));
+                        }
                     }
                 });
+
+            // Handle deferred channel addition
+            if let Some((file_idx, channel_idx)) = channel_to_add {
+                self.add_channel(file_idx, channel_idx);
+            }
         } else {
-            ui.label(
-                egui::RichText::new("Select a file to view channels")
-                    .italics()
-                    .color(egui::Color32::GRAY),
-            );
+            ui.centered_and_justified(|ui| {
+                ui.label(
+                    egui::RichText::new("Select a file to view channels")
+                        .italics()
+                        .color(egui::Color32::GRAY),
+                );
+            });
         }
     }
 
@@ -329,7 +342,8 @@ impl UltraLogApp {
                                             .strong()
                                             .color(color32),
                                     );
-                                    if ui.small_button("\u{2715}").clicked() {
+                                    // Use text "x" instead of unicode symbol
+                                    if ui.small_button("x").clicked() {
                                         channel_to_remove = Some(i);
                                     }
                                 });
@@ -435,10 +449,7 @@ impl UltraLogApp {
                             .rounding(5.0)
                             .inner_margin(10.0)
                             .show(ui, |ui| {
-                                ui.label(
-                                    egui::RichText::new(message)
-                                        .color(egui::Color32::WHITE),
-                                );
+                                ui.label(egui::RichText::new(message).color(egui::Color32::WHITE));
                             });
                     });
             } else {
@@ -456,13 +467,13 @@ impl UltraLogApp {
             }
         }
 
-        let dropped_files: Vec<PathBuf> = ctx
-            .input(|i| {
-                i.raw.dropped_files
-                    .iter()
-                    .filter_map(|f| f.path.clone())
-                    .collect()
-            });
+        let dropped_files: Vec<PathBuf> = ctx.input(|i| {
+            i.raw
+                .dropped_files
+                .iter()
+                .filter_map(|f| f.path.clone())
+                .collect()
+        });
 
         if !dropped_files.is_empty() {
             self.last_drop_time = Some(std::time::Instant::now());
@@ -495,49 +506,13 @@ impl eframe::App for UltraLogApp {
                 self.render_sidebar(ui);
             });
 
-        // Right panel for channel selection
+        // Right panel for channel selection - fills remaining height
         egui::SidePanel::right("channels_panel")
-            .default_width(250.0)
+            .default_width(300.0)
+            .min_width(200.0)
             .resizable(true)
             .show(ctx, |ui| {
-                // Channel selection at top
                 self.render_channel_selection(ui);
-
-                // Need to handle channel clicks with deferred action
-                if let Some(file_index) = self.selected_file {
-                    let file: &LoadedFile = &self.files[file_index];
-                    let search_lower = self.channel_search.to_lowercase();
-
-                    let mut channel_to_add: Option<(usize, usize)> = None;
-
-                    egui::ScrollArea::vertical()
-                        .id_salt("channel_scroll_clickable")
-                        .max_height(200.0)
-                        .show(ui, |ui| {
-                            for (channel_index, channel) in file.log.channels.iter().enumerate() {
-                                let name = channel.name();
-
-                                if !search_lower.is_empty()
-                                    && !name.to_lowercase().contains(&search_lower)
-                                {
-                                    continue;
-                                }
-
-                                let is_selected = self.selected_channels.iter().any(|c| {
-                                    c.file_index == file_index && c.channel_index == channel_index
-                                });
-
-                                let response = ui.selectable_label(is_selected, &name);
-                                if response.clicked() && !is_selected {
-                                    channel_to_add = Some((file_index, channel_index));
-                                }
-                            }
-                        });
-
-                    if let Some((file_idx, channel_idx)) = channel_to_add {
-                        self.add_channel(file_idx, channel_idx);
-                    }
-                }
             });
 
         // Main content area
