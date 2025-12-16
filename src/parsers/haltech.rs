@@ -6,7 +6,7 @@ use strum::{AsRefStr, EnumString};
 
 use super::types::{Channel, Log, Meta, Parseable, Value};
 
-/// Haltech channel types
+/// Haltech channel types - comprehensive list from actual log files
 #[derive(AsRefStr, Clone, Debug, EnumString, Serialize, Default)]
 pub enum ChannelType {
     AFR,
@@ -24,6 +24,7 @@ pub enum ChannelType {
     CurrentMilliampsAsAmps,
     Decibel,
     Density,
+    DrivenDistance,
     EngineSpeed,
     EngineVolume,
     Flow,
@@ -89,6 +90,32 @@ pub struct HaltechChannel {
 /// Haltech log file parser
 pub struct Haltech;
 
+impl Haltech {
+    /// Parse timestamp from HH:MM:SS.mmm format to seconds
+    fn parse_timestamp(timestamp: &str) -> Option<f64> {
+        // Format: "HH:MM:SS.mmm" e.g., "14:15:46.000"
+        let parts: Vec<&str> = timestamp.split(':').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+
+        let hours: f64 = parts[0].parse().ok()?;
+        let minutes: f64 = parts[1].parse().ok()?;
+
+        // Seconds may include milliseconds
+        let seconds: f64 = parts[2].parse().ok()?;
+
+        Some(hours * 3600.0 + minutes * 60.0 + seconds)
+    }
+
+    /// Check if a line looks like a data row (starts with timestamp)
+    fn is_data_row(line: &str) -> bool {
+        // Data rows start with HH:MM:SS pattern
+        let timestamp_regex = Regex::new(r"^\d{1,2}:\d{2}:\d{2}").unwrap();
+        timestamp_regex.is_match(line)
+    }
+}
+
 impl Parseable for Haltech {
     fn parse(&self, file_contents: &str) -> Result<Log, Box<dyn Error>> {
         let mut meta = HaltechMeta::default();
@@ -96,84 +123,132 @@ impl Parseable for Haltech {
         let mut times: Vec<String> = vec![];
         let mut data: Vec<Vec<Value>> = vec![];
 
-        let regex =
-            Regex::new(r"(?<name>.+) : (?<value>.+)").expect("Failed to compile regex");
+        // Regex for key-value pairs like "Key : Value"
+        let kv_regex =
+            Regex::new(r"^(?<name>[^:]+?)\s*:\s*(?<value>.+)$").expect("Failed to compile regex");
 
         let mut current_channel = HaltechChannel::default();
+        let mut in_data_section = false;
+        let mut first_timestamp: Option<f64> = None;
 
         for line in file_contents.lines() {
             let line = line.trim();
 
-            // Try to parse as key-value pair (metadata or channel definition)
-            if let Some(captures) = regex.captures(line) {
-                let name = captures["name"].trim();
-                let value = captures["value"].trim().to_string();
+            // Skip empty lines and header marker
+            if line.is_empty() || line == "%DataLog%" {
+                continue;
+            }
 
-                match name {
-                    "DataLogVersion" => meta.data_log_version = value,
-                    "Software" => meta.software = value,
-                    "SoftwareVersion" => meta.software_version = value,
-                    "DownloadDate/Time" => meta.download_date_time = value,
-                    "Log Source" => meta.log_source = value,
-                    "Log Number" => meta.log_number = value,
-                    "Log" => meta.log_date_time = value,
-                    // "Channel" key indicates start of a new channel definition
-                    "Channel" => {
-                        if !current_channel.name.is_empty() {
-                            channels.push(Channel::Haltech(current_channel));
-                        }
-                        current_channel = HaltechChannel::default();
-                        current_channel.name = value;
-                    }
-                    "ID" => current_channel.id = value,
-                    "Type" => {
-                        if let Ok(channel_type) = ChannelType::from_str(&value) {
-                            current_channel.r#type = channel_type;
-                        } else {
-                            tracing::warn!("Failed to parse channel type: {}", value);
-                        }
-                    }
-                    "DisplayMaxMin" => {
-                        let values: Vec<&str> = value.split(',').collect();
-                        if values.len() >= 2 {
-                            current_channel.display_max = values[0].trim().parse().ok();
-                            current_channel.display_min = values[1].trim().parse().ok();
-                        }
-                    }
-                    _ => {}
-                }
-            } else {
-                // Not a key-value pair - must be CSV data
-                // First, push any pending channel
+            // Check if this is a data row
+            if Self::is_data_row(line) {
+                in_data_section = true;
+
+                // Push any pending channel before processing data
                 if !current_channel.name.is_empty() {
                     channels.push(Channel::Haltech(current_channel));
                     current_channel = HaltechChannel::default();
                 }
 
                 // Parse CSV data row
-                if !line.is_empty() && !channels.is_empty() {
-                    let values: Vec<Value> = line
-                        .split(',')
-                        .enumerate()
-                        .filter_map(|(i, v)| {
-                            let v = v.trim();
-                            // First column is timestamp
-                            if i == 0 {
-                                times.push(v.to_string());
-                                return None;
-                            }
+                let parts: Vec<&str> = line.split(',').collect();
+                if parts.is_empty() {
+                    continue;
+                }
 
-                            // Parse as integer (Haltech uses integer values)
-                            v.parse::<i64>().ok().map(Value::Int)
+                // First column is timestamp
+                let timestamp_str = parts[0].trim();
+                if let Some(timestamp_secs) = Self::parse_timestamp(timestamp_str) {
+                    // Store relative time from first timestamp
+                    let relative_time = if let Some(first) = first_timestamp {
+                        timestamp_secs - first
+                    } else {
+                        first_timestamp = Some(timestamp_secs);
+                        0.0
+                    };
+                    times.push(format!("{:.3}", relative_time));
+
+                    // Parse remaining values
+                    let values: Vec<Value> = parts[1..]
+                        .iter()
+                        .filter_map(|v| {
+                            let v = v.trim();
+                            // Try parsing as i64 first, then f64
+                            if let Ok(i) = v.parse::<i64>() {
+                                Some(Value::Int(i))
+                            } else if let Ok(f) = v.parse::<f64>() {
+                                Some(Value::Float(f))
+                            } else {
+                                None
+                            }
                         })
                         .collect();
 
-                    if values.len() >= channels.len() {
+                    // Only add if we have values matching channel count
+                    if !values.is_empty() {
                         data.push(values);
+                    }
+                }
+                continue;
+            }
+
+            // Not in data section yet - parse metadata and channel definitions
+            if !in_data_section {
+                if let Some(captures) = kv_regex.captures(line) {
+                    let name = captures["name"].trim();
+                    let value = captures["value"].trim().to_string();
+
+                    match name {
+                        "DataLogVersion" => meta.data_log_version = value,
+                        "Software" => meta.software = value,
+                        "SoftwareVersion" => meta.software_version = value,
+                        "DownloadDateTime" | "DownloadDate/Time" => {
+                            meta.download_date_time = value
+                        }
+                        "Log Source" => meta.log_source = value,
+                        "Log Number" => meta.log_number = value,
+                        "Log" => meta.log_date_time = value,
+                        // "Channel" key indicates start of a new channel definition
+                        "Channel" => {
+                            if !current_channel.name.is_empty() {
+                                channels.push(Channel::Haltech(current_channel));
+                            }
+                            current_channel = HaltechChannel::default();
+                            current_channel.name = value;
+                        }
+                        "ID" => current_channel.id = value,
+                        "Type" => {
+                            if let Ok(channel_type) = ChannelType::from_str(&value) {
+                                current_channel.r#type = channel_type;
+                            } else {
+                                tracing::warn!("Unknown channel type: {}", value);
+                                current_channel.r#type = ChannelType::Raw;
+                            }
+                        }
+                        "DisplayMaxMin" => {
+                            let values: Vec<&str> = value.split(',').collect();
+                            if values.len() >= 2 {
+                                current_channel.display_max = values[0].trim().parse().ok();
+                                current_channel.display_min = values[1].trim().parse().ok();
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
         }
+
+        // Verify data integrity
+        let channel_count = channels.len();
+        if channel_count > 0 {
+            // Filter out data rows that don't match channel count
+            data.retain(|row| row.len() >= channel_count);
+        }
+
+        tracing::info!(
+            "Parsed Haltech log: {} channels, {} data points",
+            channels.len(),
+            data.len()
+        );
 
         Ok(Log {
             meta: Meta::Haltech(meta),
@@ -189,26 +264,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_haltech_metadata() {
-        let sample = r#"
-DataLogVersion : 3
-Software : Haltech ESP
-SoftwareVersion : 2.0.0
-DownloadDate/Time : 2024-01-15 10:30:00
-Log Source : NSP
-Log Number : 42
-Log : 2024-01-15 10:00:00
+    fn test_parse_timestamp() {
+        assert_eq!(Haltech::parse_timestamp("00:00:00.000"), Some(0.0));
+        assert_eq!(Haltech::parse_timestamp("00:01:00.000"), Some(60.0));
+        assert_eq!(Haltech::parse_timestamp("01:00:00.000"), Some(3600.0));
+        assert_eq!(Haltech::parse_timestamp("14:15:46.000"), Some(51346.0));
+        assert_eq!(Haltech::parse_timestamp("14:15:46.500"), Some(51346.5));
+    }
+
+    #[test]
+    fn test_parse_haltech_log() {
+        let sample = r#"%DataLog%
+DataLogVersion : 1.1
+Software : Haltech NSP
+SoftwareVersion : 999.999.999.999
+DownloadDateTime : 20250718 04:09:48
 Channel : RPM
-ID : 1
+ID : 384
 Type : EngineSpeed
-DisplayMaxMin : 10000,0
-Channel : AFR
-ID : 2
-Type : AFR
-DisplayMaxMin : 20,10
-0.000,5000,14
-0.001,5100,15
-0.002,5200,14
+DisplayMaxMin : 20000,0
+Channel : Manifold Pressure
+ID : 224
+Type : Pressure
+DisplayMaxMin : 4013,13
+Log Source : 20
+Log Number : 1118
+Log : 20250718 02:15:46
+14:15:46.000,5000,1013
+14:15:46.020,5100,1020
+14:15:46.040,5200,1030
 "#;
 
         let parser = Haltech;
@@ -216,8 +300,22 @@ DisplayMaxMin : 20,10
 
         assert_eq!(log.channels.len(), 2);
         assert_eq!(log.channels[0].name(), "RPM");
-        assert_eq!(log.channels[1].name(), "AFR");
+        assert_eq!(log.channels[1].name(), "Manifold Pressure");
         assert_eq!(log.times.len(), 3);
         assert_eq!(log.data.len(), 3);
+
+        // Check relative timestamps
+        assert_eq!(log.times[0], "0.000");
+        assert_eq!(log.times[1], "0.020");
+        assert_eq!(log.times[2], "0.040");
+    }
+
+    #[test]
+    fn test_is_data_row() {
+        assert!(Haltech::is_data_row("14:15:46.000,5000,1013"));
+        assert!(Haltech::is_data_row("0:00:00.000,100,200"));
+        assert!(!Haltech::is_data_row("Channel : RPM"));
+        assert!(!Haltech::is_data_row("ID : 384"));
+        assert!(!Haltech::is_data_row("%DataLog%"));
     }
 }

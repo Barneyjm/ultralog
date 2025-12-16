@@ -6,10 +6,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod app;
-mod parsers;
-
-use app::UltraLogApp;
+use ultralog::app::UltraLogApp;
 
 fn main() -> eframe::Result<()> {
     // Initialize logging
