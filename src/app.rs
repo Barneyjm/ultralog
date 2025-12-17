@@ -1,5 +1,5 @@
 use eframe::egui;
-use egui_plot::{Line, Plot, PlotPoints, VLine};
+use egui_plot::{Line, Plot, PlotBounds, PlotPoints, VLine};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -91,6 +91,11 @@ pub struct UltraLogApp {
     time_range: Option<(f64, f64)>,
     /// Current data record index at cursor position
     cursor_record: Option<usize>,
+    // === View Options ===
+    /// When true, keep cursor centered and pan graph during scrubbing
+    cursor_tracking: bool,
+    /// Visible time window width in seconds (for cursor tracking mode)
+    view_window_seconds: f64,
 }
 
 impl Default for UltraLogApp {
@@ -108,6 +113,8 @@ impl Default for UltraLogApp {
             cursor_time: None,
             time_range: None,
             cursor_record: None,
+            cursor_tracking: false,
+            view_window_seconds: 30.0, // Default 30 second window
         }
     }
 }
@@ -577,6 +584,44 @@ impl UltraLogApp {
                     });
                 });
         }
+
+        // View Options section at bottom
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+            // Reverse order since we're bottom-up
+            ui.add_space(10.0);
+
+            // Only show options when we have data to view
+            if !self.files.is_empty() && !self.selected_channels.is_empty() {
+                egui::Frame::none()
+                    .fill(egui::Color32::from_rgb(35, 35, 35))
+                    .rounding(8.0)
+                    .inner_margin(10.0)
+                    .show(ui, |ui| {
+                        // Cursor tracking checkbox
+                        ui.checkbox(&mut self.cursor_tracking, "Cursor Tracking");
+                        ui.label(
+                            egui::RichText::new("Keep cursor centered while scrubbing")
+                                .small()
+                                .color(egui::Color32::GRAY),
+                        );
+
+                        // Window size slider (only show when cursor tracking is enabled)
+                        if self.cursor_tracking {
+                            ui.add_space(8.0);
+                            ui.label("View Window:");
+                            ui.add(
+                                egui::Slider::new(&mut self.view_window_seconds, 5.0..=120.0)
+                                    .suffix("s")
+                                    .logarithmic(true),
+                            );
+                        }
+                    });
+
+                ui.add_space(5.0);
+                ui.separator();
+                ui.heading("View Options");
+            }
+        });
     }
 
     /// Render channel selection panel - fills available space
@@ -736,6 +781,27 @@ impl UltraLogApp {
         }
     }
 
+    /// Format time in seconds to a human-readable string (h:mm:ss.xxx or m:ss.xxx or s.xxx)
+    fn format_time(seconds: f64) -> String {
+        let total_seconds = seconds.abs();
+        let hours = (total_seconds / 3600.0).floor() as u32;
+        let minutes = ((total_seconds % 3600.0) / 60.0).floor() as u32;
+        let secs = total_seconds % 60.0;
+
+        let sign = if seconds < 0.0 { "-" } else { "" };
+
+        if hours > 0 {
+            // h:mm:ss.xxx format
+            format!("{}{}:{:02}:{:06.3}", sign, hours, minutes, secs)
+        } else if minutes > 0 {
+            // m:ss.xxx format
+            format!("{}{}:{:06.3}", sign, minutes, secs)
+        } else {
+            // s.xxxs format
+            format!("{}{:.3}s", sign, secs)
+        }
+    }
+
     /// Normalize values to 0-1 range
     fn normalize_points(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
         if points.is_empty() {
@@ -830,15 +896,42 @@ impl UltraLogApp {
         let files = &self.files;
         let selected_channels = &self.selected_channels;
         let cursor_time = self.cursor_time;
+        let cursor_tracking = self.cursor_tracking;
+        let view_window = self.view_window_seconds;
+        let time_range = self.time_range;
 
-        let response = Plot::new("log_chart")
+        // Build the plot - allow zoom always, but control drag/scroll based on tracking mode
+        let plot = Plot::new("log_chart")
             .legend(egui_plot::Legend::default())
-            .allow_drag(true)
-            .allow_zoom(true)
-            .allow_scroll(true)
             .y_axis_label("") // Hide Y axis label since values are normalized
             .show_axes([true, false]) // Show X axis (time), hide Y axis (normalized 0-1)
-            .show(ui, |plot_ui| {
+            .allow_zoom(true)
+            .allow_drag(!cursor_tracking) // Disable drag in tracking mode
+            .allow_scroll(!cursor_tracking); // Disable scroll in tracking mode
+
+        let response = plot.show(ui, |plot_ui| {
+                // In cursor tracking mode, force X bounds while preserving Y zoom
+                if cursor_tracking {
+                    if let (Some(cursor), Some((min_t, max_t))) = (cursor_time, time_range) {
+                        // Calculate view window centered on cursor
+                        let half_window = view_window / 2.0;
+                        let view_min = (cursor - half_window).max(min_t);
+                        let view_max = (cursor + half_window).min(max_t);
+
+                        // Get current bounds to preserve Y zoom level
+                        let current_bounds = plot_ui.plot_bounds();
+                        let y_min = current_bounds.min()[1];
+                        let y_max = current_bounds.max()[1];
+
+                        // Force X bounds centered on cursor, but keep Y bounds from user's zoom
+                        let new_bounds = PlotBounds::from_min_max(
+                            [view_min, y_min],
+                            [view_max, y_max],
+                        );
+                        plot_ui.set_plot_bounds(new_bounds);
+                    }
+                }
+
                 // Draw channel data lines with values in legend
                 for (i, selected) in selected_channels.iter().enumerate() {
                     if selected.file_index >= files.len() {
@@ -889,6 +982,8 @@ impl UltraLogApp {
                     let clamped_time = clicked_time.clamp(min, max);
                     self.cursor_time = Some(clamped_time);
                     self.cursor_record = self.find_record_at_time(clamped_time);
+                    // Force repaint to update legend values immediately
+                    ui.ctx().request_repaint();
                 }
             }
         }
@@ -908,13 +1003,13 @@ impl UltraLogApp {
         // Time labels row
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new(format!("{:.3}s", min_time))
+                egui::RichText::new(Self::format_time(min_time))
                     .small()
                     .color(egui::Color32::LIGHT_GRAY),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
-                    egui::RichText::new(format!("{:.3}s", max_time))
+                    egui::RichText::new(Self::format_time(max_time))
                         .small()
                         .color(egui::Color32::LIGHT_GRAY),
                 );
@@ -942,6 +1037,8 @@ impl UltraLogApp {
         if slider_response.changed() {
             self.cursor_time = Some(slider_value);
             self.cursor_record = self.find_record_at_time(slider_value);
+            // Force repaint to update legend values
+            ui.ctx().request_repaint();
         }
     }
 
@@ -951,7 +1048,7 @@ impl UltraLogApp {
             // Current time display
             if let Some(time) = self.cursor_time {
                 ui.label(
-                    egui::RichText::new(format!("Time: {:.3}s", time))
+                    egui::RichText::new(format!("Time: {}", Self::format_time(time)))
                         .strong()
                         .color(egui::Color32::from_rgb(0, 255, 255)), // Cyan to match cursor
                 );
