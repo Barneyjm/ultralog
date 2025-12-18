@@ -7,7 +7,7 @@ fn main() {
         res.set_icon("assets/icon.ico")
             .set("ProductName", "UltraLog")
             .set("FileDescription", "High-performance ECU log viewer")
-            .set("LegalCopyright", "Copyright (c) 2024 Cole Gentry");
+            .set("LegalCopyright", "Copyright (c) 2026 Cole Gentry");
 
         // Only compile if icon exists
         if std::path::Path::new("assets/icon.ico").exists() {

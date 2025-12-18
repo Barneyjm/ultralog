@@ -1,16 +1,125 @@
-# Tauri + Vue + TypeScript
+# UltraLog
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+A high-performance ECU log viewer written in Rust.
 
-## Recommended IDE Setup
+![CI](https://github.com/SomethingNew71/UltraLog/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## Overview
 
-## Type Support For `.vue` Imports in TS
+UltraLog is a cross-platform desktop application for viewing and analyzing ECU (Engine Control Unit) log files from automotive performance tuning systems. Built with performance in mind, it handles large log files smoothly using advanced downsampling algorithms.
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+## Features
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
+- **Multi-channel visualization** - Plot up to 10 data channels simultaneously with normalized overlay
+- **High-performance rendering** - LTTB (Largest Triangle Three Buckets) downsampling for smooth performance with large datasets
+- **Interactive timeline** - Click-to-seek, timeline scrubber, and cursor tracking modes
+- **Cursor tracking mode** - Keep the cursor centered while scrubbing through data
+- **Drag and drop** - Simply drop log files onto the window to load them
+- **Real-time values** - Legend displays live values at cursor position with units
+- **Cross-platform** - Runs on Windows, macOS, and Linux
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+## Supported ECU Formats
+
+- **Haltech** - Full support for Haltech CAN protocol log files with automatic unit conversion
+- More formats planned (MegaSquirt, AEM, Speeduino, etc.)
+
+## Installation
+
+### Pre-built Binaries
+
+Download the latest release for your platform from the [Releases](https://github.com/SomethingNew71/UltraLog/releases) page:
+
+- `ultralog-windows.exe` - Windows x64
+- `ultralog-macos-intel` - macOS Intel
+- `ultralog-macos-arm64` - macOS Apple Silicon
+- `ultralog-linux` - Linux x64
+
+### Building from Source
+
+**Prerequisites:**
+
+- [Rust](https://rustup.rs/) (latest stable)
+- Platform-specific dependencies (see below)
+
+**Linux dependencies:**
+
+```bash
+sudo apt-get install -y \
+    libxcb-render0-dev \
+    libxcb-shape0-dev \
+    libxcb-xfixes0-dev \
+    libxkbcommon-dev \
+    libssl-dev \
+    libgtk-3-dev \
+    libglib2.0-dev \
+    libatk1.0-dev \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libgdk-pixbuf2.0-dev
+```
+
+**Build:**
+
+```bash
+git clone https://github.com/SomethingNew71/UltraLog.git
+cd UltraLog
+cargo build --release
+```
+
+The binary will be at `target/release/ultralog` (or `ultralog.exe` on Windows).
+
+## Usage
+
+1. Launch UltraLog
+2. Click "Select a file" or drag and drop a log file onto the window
+3. Select channels from the left panel to visualize
+4. Use the timeline scrubber or click on the chart to navigate
+5. Enable "Cursor Tracking" in View Options to keep the cursor centered while scrubbing
+
+### Supported File Types
+
+- `.csv` - CSV log files
+- `.log` - Standard log files
+- `.txt` - Text-based log files
+
+## Tech Stack
+
+- **Language:** Rust
+- **GUI Framework:** [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) / [egui](https://github.com/emilk/egui)
+- **Charting:** [egui_plot](https://github.com/emilk/egui/tree/master/crates/egui_plot)
+- **File Dialogs:** [rfd](https://github.com/PolyMeilex/rfd)
+- **Serialization:** serde / serde_json
+- **Error Handling:** thiserror / anyhow
+- **Logging:** tracing / tracing-subscriber
+
+## Development
+
+```bash
+# Run in debug mode
+cargo run
+
+# Run with release optimizations
+cargo run --release
+
+# Run tests
+cargo test
+
+# Check formatting
+cargo fmt --all -- --check
+
+# Run clippy lints
+cargo clippy -- -D warnings
+```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Author
+
+Cole Gentry
+
+## Related Projects
+
+- [Classic Mini DIY](https://classicminidiy.com) - Classic Mini enthusiast website with tools and resources
