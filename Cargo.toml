@@ -39,6 +39,7 @@ strum = { version = "0.26", features = ["derive"] }
 
 # File handling
 rfd = "0.15"  # Native file dialogs
+open = "5"    # Open URLs in default browser
 
 # Error handling
 thiserror = "2.0"

@@ -43,6 +43,245 @@ const MAX_CHANNELS: usize = 10;
 /// Maximum points to render in chart (for performance)
 const MAX_CHART_POINTS: usize = 2000;
 
+// ============================================================================
+// Unit Preference Enums
+// ============================================================================
+
+/// Temperature unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum TemperatureUnit {
+    Kelvin,
+    #[default]
+    Celsius,
+    Fahrenheit,
+}
+
+impl TemperatureUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            TemperatureUnit::Kelvin => "K",
+            TemperatureUnit::Celsius => "°C",
+            TemperatureUnit::Fahrenheit => "°F",
+        }
+    }
+
+    /// Convert from Kelvin to the selected unit
+    pub fn convert_from_kelvin(&self, kelvin: f64) -> f64 {
+        match self {
+            TemperatureUnit::Kelvin => kelvin,
+            TemperatureUnit::Celsius => kelvin - 273.15,
+            TemperatureUnit::Fahrenheit => (kelvin - 273.15) * 9.0 / 5.0 + 32.0,
+        }
+    }
+}
+
+/// Pressure unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum PressureUnit {
+    #[default]
+    KPa,
+    PSI,
+    Bar,
+}
+
+impl PressureUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            PressureUnit::KPa => "kPa",
+            PressureUnit::PSI => "PSI",
+            PressureUnit::Bar => "bar",
+        }
+    }
+
+    /// Convert from kPa to the selected unit
+    pub fn convert_from_kpa(&self, kpa: f64) -> f64 {
+        match self {
+            PressureUnit::KPa => kpa,
+            PressureUnit::PSI => kpa * 0.145038,
+            PressureUnit::Bar => kpa * 0.01,
+        }
+    }
+}
+
+/// Speed unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum SpeedUnit {
+    #[default]
+    KmH,
+    Mph,
+}
+
+impl SpeedUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            SpeedUnit::KmH => "km/h",
+            SpeedUnit::Mph => "mph",
+        }
+    }
+
+    /// Convert from km/h to the selected unit
+    pub fn convert_from_kmh(&self, kmh: f64) -> f64 {
+        match self {
+            SpeedUnit::KmH => kmh,
+            SpeedUnit::Mph => kmh * 0.621371,
+        }
+    }
+}
+
+/// Distance unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum DistanceUnit {
+    #[default]
+    Kilometers,
+    Miles,
+}
+
+impl DistanceUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            DistanceUnit::Kilometers => "km",
+            DistanceUnit::Miles => "mi",
+        }
+    }
+
+    /// Convert from km to the selected unit
+    pub fn convert_from_km(&self, km: f64) -> f64 {
+        match self {
+            DistanceUnit::Kilometers => km,
+            DistanceUnit::Miles => km * 0.621371,
+        }
+    }
+}
+
+/// Fuel economy unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum FuelEconomyUnit {
+    #[default]
+    LPer100Km,
+    Mpg,
+    KmPerL,
+}
+
+impl FuelEconomyUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            FuelEconomyUnit::LPer100Km => "L/100km",
+            FuelEconomyUnit::Mpg => "mpg",
+            FuelEconomyUnit::KmPerL => "km/L",
+        }
+    }
+
+    /// Convert from L/100km to the selected unit
+    pub fn convert_from_l_per_100km(&self, l_per_100km: f64) -> f64 {
+        match self {
+            FuelEconomyUnit::LPer100Km => l_per_100km,
+            FuelEconomyUnit::Mpg => {
+                if l_per_100km > 0.0 {
+                    235.215 / l_per_100km
+                } else {
+                    0.0
+                }
+            }
+            FuelEconomyUnit::KmPerL => {
+                if l_per_100km > 0.0 {
+                    100.0 / l_per_100km
+                } else {
+                    0.0
+                }
+            }
+        }
+    }
+}
+
+/// Volume unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum VolumeUnit {
+    #[default]
+    Liters,
+    Gallons,
+}
+
+impl VolumeUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            VolumeUnit::Liters => "L",
+            VolumeUnit::Gallons => "gal",
+        }
+    }
+
+    /// Convert from liters to the selected unit
+    pub fn convert_from_liters(&self, liters: f64) -> f64 {
+        match self {
+            VolumeUnit::Liters => liters,
+            VolumeUnit::Gallons => liters * 0.264172,
+        }
+    }
+}
+
+/// Flow rate unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum FlowUnit {
+    #[default]
+    CcPerMin,
+    LbPerHr,
+}
+
+impl FlowUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            FlowUnit::CcPerMin => "cc/min",
+            FlowUnit::LbPerHr => "lb/hr",
+        }
+    }
+
+    /// Convert from cc/min to the selected unit (assuming gasoline density ~0.75 g/cc)
+    pub fn convert_from_cc_per_min(&self, cc_per_min: f64) -> f64 {
+        match self {
+            FlowUnit::CcPerMin => cc_per_min,
+            // cc/min * 0.75 g/cc * 60 min/hr / 453.592 g/lb = lb/hr
+            FlowUnit::LbPerHr => cc_per_min * 0.75 * 60.0 / 453.592,
+        }
+    }
+}
+
+/// Acceleration unit preference
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum AccelerationUnit {
+    #[default]
+    MPerS2,
+    G,
+}
+
+impl AccelerationUnit {
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            AccelerationUnit::MPerS2 => "m/s²",
+            AccelerationUnit::G => "g",
+        }
+    }
+
+    /// Convert from m/s² to the selected unit
+    pub fn convert_from_m_per_s2(&self, m_per_s2: f64) -> f64 {
+        match self {
+            AccelerationUnit::MPerS2 => m_per_s2,
+            AccelerationUnit::G => m_per_s2 / 9.80665,
+        }
+    }
+}
+
+/// User preferences for display units
+#[derive(Clone, Debug, Default)]
+pub struct UnitPreferences {
+    pub temperature: TemperatureUnit,
+    pub pressure: PressureUnit,
+    pub speed: SpeedUnit,
+    pub distance: DistanceUnit,
+    pub fuel_economy: FuelEconomyUnit,
+    pub volume: VolumeUnit,
+    pub flow: FlowUnit,
+    pub acceleration: AccelerationUnit,
+}
+
 /// Represents a loaded log file
 #[derive(Clone)]
 pub struct LoadedFile {
@@ -126,6 +365,9 @@ pub struct UltraLogApp {
     chart_interacted: bool,
     /// Initial view window in seconds (shown before user interacts with chart)
     initial_view_seconds: f64,
+    // === Unit Preferences ===
+    /// User preferences for display units
+    unit_preferences: UnitPreferences,
 }
 
 impl Default for UltraLogApp {
@@ -151,6 +393,7 @@ impl Default for UltraLogApp {
             color_blind_mode: false,
             chart_interacted: false,
             initial_view_seconds: 60.0, // Start with 60 second view
+            unit_preferences: UnitPreferences::default(),
         }
     }
 }
@@ -200,6 +443,59 @@ impl UltraLogApp {
             CHART_COLORS
         };
         palette[color_index % palette.len()]
+    }
+
+    /// Convert a value and get the display unit based on the source unit string
+    /// Returns (converted_value, display_unit)
+    fn convert_value<'a>(&self, value: f64, source_unit: &'a str) -> (f64, &'a str) {
+        match source_unit {
+            // Temperature (source is Kelvin)
+            "K" => (
+                self.unit_preferences.temperature.convert_from_kelvin(value),
+                self.unit_preferences.temperature.symbol(),
+            ),
+            // Pressure (source is kPa)
+            "kPa" => (
+                self.unit_preferences.pressure.convert_from_kpa(value),
+                self.unit_preferences.pressure.symbol(),
+            ),
+            // Speed (source is km/h)
+            "km/h" => (
+                self.unit_preferences.speed.convert_from_kmh(value),
+                self.unit_preferences.speed.symbol(),
+            ),
+            // Distance (source is km)
+            "km" => (
+                self.unit_preferences.distance.convert_from_km(value),
+                self.unit_preferences.distance.symbol(),
+            ),
+            // Fuel economy (source is L/100km)
+            "L/100km" => (
+                self.unit_preferences
+                    .fuel_economy
+                    .convert_from_l_per_100km(value),
+                self.unit_preferences.fuel_economy.symbol(),
+            ),
+            // Volume (source is L)
+            "L" => (
+                self.unit_preferences.volume.convert_from_liters(value),
+                self.unit_preferences.volume.symbol(),
+            ),
+            // Flow (source is cc/min)
+            "cc/min" => (
+                self.unit_preferences.flow.convert_from_cc_per_min(value),
+                self.unit_preferences.flow.symbol(),
+            ),
+            // Acceleration (source is m/s²)
+            "m/s²" => (
+                self.unit_preferences
+                    .acceleration
+                    .convert_from_m_per_s2(value),
+                self.unit_preferences.acceleration.symbol(),
+            ),
+            // No conversion needed for other units
+            _ => (value, source_unit),
+        }
     }
 
     /// Start loading a file in the background
@@ -347,6 +643,30 @@ impl UltraLogApp {
             }
         }
         None
+    }
+
+    /// Get min and max values for a channel across all records
+    fn get_channel_min_max(&self, file_index: usize, channel_index: usize) -> Option<(f64, f64)> {
+        if file_index >= self.files.len() {
+            return None;
+        }
+
+        let file = &self.files[file_index];
+        let data = file.log.get_channel_data(channel_index);
+
+        if data.is_empty() {
+            return None;
+        }
+
+        let mut min_val = f64::MAX;
+        let mut max_val = f64::MIN;
+
+        for &value in &data {
+            min_val = min_val.min(value);
+            max_val = max_val.max(value);
+        }
+
+        Some((min_val, max_val))
     }
 
     /// Remove a loaded file
@@ -565,7 +885,6 @@ impl UltraLogApp {
                             file.log.channels.len(),
                             file.log.data.len()
                         ))
-                        .small()
                         .color(egui::Color32::GRAY),
                     );
                 });
@@ -685,7 +1004,6 @@ impl UltraLogApp {
                         ui.checkbox(&mut self.cursor_tracking, "Cursor Tracking");
                         ui.label(
                             egui::RichText::new("Keep cursor centered while scrubbing")
-                                .small()
                                 .color(egui::Color32::GRAY),
                         );
 
@@ -708,7 +1026,6 @@ impl UltraLogApp {
                         ui.checkbox(&mut self.color_blind_mode, "Color Blind Mode");
                         ui.label(
                             egui::RichText::new("Use accessible color palette")
-                                .small()
                                 .color(egui::Color32::GRAY),
                         );
                     });
@@ -752,6 +1069,7 @@ impl UltraLogApp {
             // Channel list - use all remaining vertical space
             let search_lower = self.channel_search.to_lowercase();
             let mut channel_to_add: Option<(usize, usize)> = None;
+            let mut channel_to_remove: Option<usize> = None;
 
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
@@ -767,10 +1085,11 @@ impl UltraLogApp {
                             continue;
                         }
 
-                        // Check if already selected
-                        let is_selected = self.selected_channels.iter().any(|c| {
+                        // Check if already selected and get its index in selected_channels
+                        let selected_idx = self.selected_channels.iter().position(|c| {
                             c.file_index == file_index && c.channel_index == channel_index
                         });
+                        let is_selected = selected_idx.is_some();
 
                         // Build the label with checkmark prefix if selected
                         let label_text = if is_selected {
@@ -781,11 +1100,22 @@ impl UltraLogApp {
 
                         let response = ui.selectable_label(is_selected, label_text);
 
-                        if response.clicked() && !is_selected {
-                            channel_to_add = Some((file_index, channel_index));
+                        if response.clicked() {
+                            if let Some(idx) = selected_idx {
+                                // Already selected - remove it
+                                channel_to_remove = Some(idx);
+                            } else {
+                                // Not selected - add it
+                                channel_to_add = Some((file_index, channel_index));
+                            }
                         }
                     }
                 });
+
+            // Handle deferred channel removal (must happen before addition to keep indices valid)
+            if let Some(idx) = channel_to_remove {
+                self.remove_channel(idx);
+            }
 
             // Handle deferred channel addition
             if let Some((file_idx, channel_idx)) = channel_to_add {
@@ -846,10 +1176,19 @@ impl UltraLogApp {
                                     selected.channel.display_min(),
                                     selected.channel.display_max(),
                                 ) {
+                                    let source_unit = selected.channel.unit();
+                                    let (conv_min, display_unit) =
+                                        self.convert_value(min, source_unit);
+                                    let (conv_max, _) = self.convert_value(max, source_unit);
+                                    let unit_str = if display_unit.is_empty() {
+                                        String::new()
+                                    } else {
+                                        format!(" {}", display_unit)
+                                    };
                                     ui.label(
                                         egui::RichText::new(format!(
-                                            "Range: {:.0} - {:.0}",
-                                            min, max
+                                            "Range: {:.0}{} - {:.0}{}",
+                                            conv_min, unit_str, conv_max, unit_str
                                         ))
                                         .small()
                                         .color(egui::Color32::GRAY),
@@ -975,11 +1314,13 @@ impl UltraLogApp {
                         selected.channel_index,
                         record,
                     ) {
-                        let unit = selected.channel.unit();
-                        if unit.is_empty() {
-                            format!("{}: {:.2}", base_name, value)
+                        let source_unit = selected.channel.unit();
+                        let (converted_value, display_unit) =
+                            self.convert_value(value, source_unit);
+                        if display_unit.is_empty() {
+                            format!("{}: {:.2}", base_name, converted_value)
                         } else {
-                            format!("{}: {:.2} {}", base_name, value, unit)
+                            format!("{}: {:.2} {}", base_name, converted_value, display_unit)
                         }
                     } else {
                         base_name.to_string()
@@ -1136,6 +1477,78 @@ impl UltraLogApp {
                 }
             }
         }
+
+        // Render min/max legend overlay in top-left corner
+        self.render_minmax_legend(ui, response.response.rect);
+    }
+
+    /// Render the min/max legend overlay in the top-left corner of the chart
+    fn render_minmax_legend(&self, ui: &mut egui::Ui, chart_rect: egui::Rect) {
+        if self.selected_channels.is_empty() {
+            return;
+        }
+
+        let legend_pos = chart_rect.left_top() + egui::vec2(10.0, 10.0);
+
+        egui::Area::new(egui::Id::new("minmax_legend"))
+            .fixed_pos(legend_pos)
+            .order(egui::Order::Foreground)
+            .show(ui.ctx(), |ui| {
+                egui::Frame::none()
+                    .fill(egui::Color32::from_rgba_unmultiplied(30, 30, 30, 220))
+                    .rounding(6.0)
+                    .inner_margin(8.0)
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)))
+                    .show(ui, |ui| {
+                        ui.set_min_width(120.0);
+
+                        ui.label(
+                            egui::RichText::new("Min / Max")
+                                .color(egui::Color32::GRAY),
+                        );
+                        ui.add_space(4.0);
+
+                        for selected in &self.selected_channels {
+                            let color = self.get_channel_color(selected.color_index);
+                            let color32 = egui::Color32::from_rgb(color[0], color[1], color[2]);
+
+                            if let Some((min_val, max_val)) =
+                                self.get_channel_min_max(selected.file_index, selected.channel_index)
+                            {
+                                let source_unit = selected.channel.unit();
+                                let (converted_min, display_unit) =
+                                    self.convert_value(min_val, source_unit);
+                                let (converted_max, _) = self.convert_value(max_val, source_unit);
+                                let unit_str = if display_unit.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!(" {}", display_unit)
+                                };
+
+                                ui.horizontal(|ui| {
+                                    // Color indicator dot
+                                    let (rect, _) = ui.allocate_exact_size(
+                                        egui::vec2(10.0, 10.0),
+                                        egui::Sense::hover(),
+                                    );
+                                    ui.painter().circle_filled(rect.center(), 5.0, color32);
+
+                                    ui.label(
+                                        egui::RichText::new(format!(
+                                            "{}: {:.2}{} / {:.2}{}",
+                                            selected.channel.name(),
+                                            converted_min,
+                                            unit_str,
+                                            converted_max,
+                                            unit_str
+                                        ))
+                                        .color(color32),
+                                    );
+                                });
+                            }
+                        }
+                    });
+            });
     }
 
     /// Render the timeline scrubber bar
@@ -1442,6 +1855,280 @@ impl eframe::App for UltraLogApp {
 
         // Toast notifications
         self.render_toast(ctx);
+
+        // Menu bar at top
+        egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
+            egui::menu::bar(ui, |ui| {
+                // Units menu
+                ui.menu_button("Units", |ui| {
+                    ui.set_min_width(180.0);
+
+                    // Temperature submenu
+                    ui.menu_button("🌡️  Temperature", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.temperature,
+                                TemperatureUnit::Celsius,
+                                "Celsius (°C)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.temperature,
+                                TemperatureUnit::Fahrenheit,
+                                "Fahrenheit (°F)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.temperature,
+                                TemperatureUnit::Kelvin,
+                                "Kelvin (K)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
+                    // Pressure submenu
+                    ui.menu_button("💨  Pressure", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.pressure,
+                                PressureUnit::KPa,
+                                "Kilopascal (kPa)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.pressure,
+                                PressureUnit::PSI,
+                                "PSI",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.pressure,
+                                PressureUnit::Bar,
+                                "Bar",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
+                    // Speed submenu
+                    ui.menu_button("🏎️  Speed", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.speed,
+                                SpeedUnit::KmH,
+                                "Kilometers/hour (km/h)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.speed,
+                                SpeedUnit::Mph,
+                                "Miles/hour (mph)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
+                    // Distance submenu
+                    ui.menu_button("📏  Distance", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.distance,
+                                DistanceUnit::Kilometers,
+                                "Kilometers (km)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.distance,
+                                DistanceUnit::Miles,
+                                "Miles (mi)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
+                    ui.separator();
+
+                    // Fuel Economy submenu
+                    ui.menu_button("⛽  Fuel Economy", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.fuel_economy,
+                                FuelEconomyUnit::LPer100Km,
+                                "Liters/100km (L/100km)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.fuel_economy,
+                                FuelEconomyUnit::Mpg,
+                                "Miles/gallon (mpg)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.fuel_economy,
+                                FuelEconomyUnit::KmPerL,
+                                "Kilometers/liter (km/L)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
+                    // Volume submenu
+                    ui.menu_button("🪣  Volume", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.volume,
+                                VolumeUnit::Liters,
+                                "Liters (L)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.volume,
+                                VolumeUnit::Gallons,
+                                "Gallons (gal)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
+                    // Flow submenu
+                    ui.menu_button("💧  Flow Rate", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.flow,
+                                FlowUnit::CcPerMin,
+                                "cc/min",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.flow,
+                                FlowUnit::LbPerHr,
+                                "lb/hr",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
+                    ui.separator();
+
+                    // Acceleration submenu
+                    ui.menu_button("📈  Acceleration", |ui| {
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.acceleration,
+                                AccelerationUnit::MPerS2,
+                                "m/s²",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut self.unit_preferences.acceleration,
+                                AccelerationUnit::G,
+                                "g-force (g)",
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+                });
+
+                ui.menu_button("Help", |ui| {
+                    ui.set_min_width(200.0);
+
+                    if ui.button("📖  Documentation").clicked() {
+                        let _ = open::that("https://github.com/SomethingNew71/UltraLog#readme");
+                        ui.close_menu();
+                    }
+
+                    if ui.button("🐛  Report Issue").clicked() {
+                        let _ = open::that("https://github.com/SomethingNew71/UltraLog/issues");
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+
+                    if ui.button("📧  Email Support").clicked() {
+                        let _ = open::that("mailto:support@classicminidiy.com?subject=UltraLog%20Support");
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+
+                    if ui.button("💝  Support Development").clicked() {
+                        let _ = open::that("https://github.com/sponsors/SomethingNew71");
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION")))
+                                .small()
+                                .color(egui::Color32::GRAY),
+                        );
+                    });
+                });
+            });
+        });
 
         // Left sidebar panel
         egui::SidePanel::left("files_panel")
