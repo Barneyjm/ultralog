@@ -1,36 +1,127 @@
 # UltraLog
-<img width="500"  alt="socialWide1" src="https://github.com/user-attachments/assets/9924e8ae-ace8-4b16-a8d6-cbf456a8bc62" />
 
-A high-performance ECU log viewer written in Rust.
+<img width="500" alt="UltraLog Banner" src="https://github.com/user-attachments/assets/9924e8ae-ace8-4b16-a8d6-cbf456a8bc62" />
+
+A high-performance, cross-platform ECU log viewer written in Rust.
 
 ![CI](https://github.com/SomethingNew71/UltraLog/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Supported ECU Formats](#supported-ecu-formats)
+- [Installation](#installation)
+  - [Pre-built Binaries](#pre-built-binaries)
+  - [Building from Source](#building-from-source)
+- [Quick Start Guide](#quick-start-guide)
+- [User Guide](#user-guide)
+  - [Loading Log Files](#loading-log-files)
+  - [Visualizing Data](#visualizing-data)
+  - [Timeline and Playback](#timeline-and-playback)
+  - [Unit Preferences](#unit-preferences)
+  - [Field Normalization](#field-normalization)
+  - [Exporting Charts](#exporting-charts)
+  - [Scatter Plot Tool](#scatter-plot-tool)
+  - [Accessibility Features](#accessibility-features)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Tech Stack](#tech-stack)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Author](#author)
+
+---
 
 ## Overview
 
-UltraLog is a cross-platform desktop application for viewing and analyzing ECU (Engine Control Unit) log files from automotive performance tuning systems. Built with performance in mind, it handles large log files smoothly using advanced downsampling algorithms.
+UltraLog is a desktop application designed for automotive tuners, engineers, and enthusiasts who need to analyze ECU (Engine Control Unit) log data. Built with Rust for maximum performance, it handles large log files (millions of data points) smoothly using advanced downsampling algorithms while maintaining visual accuracy.
+
+**Key Benefits:**
+- **Fast** - Handles massive log files without lag using LTTB downsampling
+- **Universal** - Supports multiple ECU formats in one unified interface
+- **Cross-platform** - Runs natively on Windows, macOS, and Linux
+- **Accessible** - Colorblind-friendly palette and clear visualization
+
+---
 
 ## Features
 
-- **Multi-channel visualization** - Plot up to 10 data channels simultaneously with normalized overlay
-- **High-performance rendering** - LTTB (Largest Triangle Three Buckets) downsampling for smooth performance with large datasets
-- **Interactive timeline** - Click-to-seek, timeline scrubber, and playback controls (0.25x to 8x speed)
+### Data Visualization
+- **Multi-channel overlay** - Plot up to 10 data channels simultaneously on a single chart
+- **Normalized display** - All channels scaled 0-1 for easy comparison regardless of original units
+- **Min/Max legend** - Peak values displayed for each channel at a glance
+- **Real-time cursor values** - Legend shows live values at cursor position with proper units
+- **High-performance rendering** - LTTB (Largest Triangle Three Buckets) algorithm reduces millions of points to 2,000 while preserving visual fidelity
+
+### Timeline and Playback
+- **Interactive timeline** - Click anywhere on the chart or use the scrubber to navigate
+- **Playback controls** - Play, pause, stop with adjustable speed (0.25x, 0.5x, 1x, 2x, 4x, 8x)
 - **Cursor tracking mode** - Keep the cursor centered while scrubbing through data
-- **Unit preferences** - Select between metric/imperial units for temperature, pressure, speed, distance, fuel economy, volume, flow rate, and acceleration
-- **Min/Max legend** - See peak values for each channel at a glance
-- **Colorblind mode** - Accessible color palette based on Wong's optimized palette
-- **Drag and drop** - Simply drop log files onto the window to load them
-- **Real-time values** - Legend displays live values at cursor position with units
-- **Cross-platform** - Runs on Windows, macOS, and Linux
+- **Manual time input** - Type a specific time in seconds to jump directly to that position
+
+### Multi-File Support
+- **Tab-based interface** - Open multiple log files with Chrome-style tabs
+- **Drag and drop** - Simply drop files onto the window to load them
+- **Per-tab state** - Each tab maintains its own channel selections and view settings
+- **Duplicate detection** - Prevents loading the same file twice
+
+### Unit Conversion
+Configurable units for 8 measurement categories:
+- **Temperature** - Kelvin, Celsius, Fahrenheit
+- **Pressure** - kPa, PSI, Bar
+- **Speed** - km/h, mph
+- **Distance** - km, miles
+- **Fuel Economy** - L/100km, MPG
+- **Volume** - Liters, Gallons
+- **Flow Rate** - L/min, GPM
+- **Acceleration** - m/s², g
+
+### Export Options
+- **PNG Export** - Save chart views as PNG images
+- **PDF Export** - Generate PDF reports of your visualizations
+
+### Additional Tools
+- **Scatter Plot** - XY scatter visualization for channel correlation analysis
+- **Normalization Editor** - Create custom field name mappings for cross-ECU comparison
+- **Field Normalization** - Maps ECU-specific channel names to standard names (e.g., "Act_AFR" → "AFR")
+
+### Accessibility
+- **Colorblind mode** - Wong's optimized color palette designed for deuteranopia, protanopia, and tritanopia
+- **Custom font** - Clear, readable Outfit typeface
+- **Toast notifications** - Non-intrusive feedback for user actions
+
+---
 
 ## Supported ECU Formats
 
-- **Haltech** - Full support for Haltech CAN protocol log files with automatic unit conversion
-- **ECUMaster** - Support for EMU Pro CSV exports with automatic unit inference
-  - CSV files (semicolon or tab-delimited) exported from EMU Pro software
-  - Automatic unit detection based on channel paths (RPM, temperature, pressure, lambda, etc.)
-  - Note: The native `.emuprolog` binary format is not currently supported; please use CSV export from EMU Pro software
-- More formats planned (MegaSquirt, AEM, Speeduino, etc.)
+### Haltech - Full Support
+- **File type:** CSV exports from Haltech NSP software
+- **Features:** 50+ channel types with automatic unit conversion
+- **Supported data:** Pressure, temperature, RPM, throttle position, boost, ignition timing, fuel trim, and more
+
+### ECUMaster EMU Pro - Full Support
+- **File type:** CSV exports (semicolon or tab-delimited) from EMU Pro software
+- **Features:** Hierarchical channel paths, automatic unit inference
+- **Note:** Native `.emuprolog` binary format not supported; export to CSV from EMU Pro
+
+### Speeduino / rusEFI - Full Support
+- **File type:** MegaLogViewer binary format (`.mlg`)
+- **Features:** Binary format parsing with field type detection
+- **Supported data:** All standard Speeduino/rusEFI channels with timestamps
+
+### Coming Soon
+- MegaSquirt
+- AEM
+- MaxxECU
+- MoTeC
+- Link ECU
+
+---
 
 ## Installation
 
@@ -38,22 +129,31 @@ UltraLog is a cross-platform desktop application for viewing and analyzing ECU (
 
 Download the latest release for your platform from the [Releases](https://github.com/SomethingNew71/UltraLog/releases) page:
 
-- `ultralog-windows.exe` - Windows x64
-- `ultralog-macos-intel` - macOS Intel
-- `ultralog-macos-arm64` - macOS Apple Silicon
-- `ultralog-linux` - Linux x64
+| Platform | Download | Notes |
+|----------|----------|-------|
+| Windows x64 | `ultralog-windows.exe` | Windows 10/11 |
+| macOS Intel | `ultralog-macos-intel` | macOS 10.15+ |
+| macOS Apple Silicon | `ultralog-macos-arm64` | M1/M2/M3 Macs |
+| Linux x64 | `ultralog-linux` | Most distributions |
+
+**Windows:** Simply download and run the `.exe` file. You may see a SmartScreen warning on first run - click "More info" → "Run anyway".
+
+**macOS:** After downloading, you may need to right-click → Open the first time to bypass Gatekeeper. Grant any requested permissions for file access.
+
+**Linux:** Make the binary executable with `chmod +x ultralog-linux`, then run `./ultralog-linux`.
 
 ### Building from Source
 
 **Prerequisites:**
+- [Rust](https://rustup.rs/) (latest stable version)
+- Platform-specific build tools (see below)
 
-- [Rust](https://rustup.rs/) (latest stable)
-- Platform-specific dependencies (see below)
-
-**Linux dependencies:**
+**Linux Dependencies (Ubuntu/Debian):**
 
 ```bash
+sudo apt-get update
 sudo apt-get install -y \
+    build-essential \
     libxcb-render0-dev \
     libxcb-shape0-dev \
     libxcb-xfixes0-dev \
@@ -67,70 +167,321 @@ sudo apt-get install -y \
     libgdk-pixbuf2.0-dev
 ```
 
-**Build:**
+**macOS Dependencies:**
 
 ```bash
-git clone https://github.com/SomethingNew71/UltraLog.git
-cd UltraLog
-cargo build --release
+xcode-select --install
 ```
 
-The binary will be at `target/release/ultralog` (or `ultralog.exe` on Windows).
+**Windows Dependencies:**
+- Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+- Select "Desktop development with C++" workload
 
-## Usage
+**Build Steps:**
 
-1. Launch UltraLog
-2. Click "Select a file" or drag and drop a log file onto the window
-3. Select channels from the right panel to visualize (click to toggle)
-4. Use the timeline scrubber or click on the chart to navigate
-5. Use playback controls to animate through the data at various speeds
-6. Configure unit preferences via the **Units** menu (temperature, pressure, speed, etc.)
-7. Enable "Cursor Tracking" in View Options to keep the cursor centered while scrubbing
-8. Enable "Color Blind Mode" in View Options for accessible colors
+```bash
+# Clone the repository
+git clone https://github.com/SomethingNew71/UltraLog.git
+cd UltraLog
 
-### Supported File Types
+# Build release version (optimized)
+cargo build --release
 
-- `.csv` - CSV log files
-- `.log` - Standard log files
-- `.txt` - Text-based log files
+# The binary will be at:
+# - Windows: target/release/ultralog.exe
+# - macOS/Linux: target/release/ultralog
+```
+
+---
+
+## Quick Start Guide
+
+1. **Launch UltraLog** - Double-click the application or run from terminal
+
+2. **Load a log file** - Either:
+   - Click the "Select a file" button in the left sidebar
+   - Drag and drop a log file onto the window
+
+3. **Select channels** - Click channel names in the right panel to add them to the chart (up to 10)
+
+4. **Navigate the data** -
+   - Click anywhere on the chart to move the cursor
+   - Use the timeline scrubber at the bottom
+   - Use playback controls to animate through the data
+
+5. **Customize your view** -
+   - Change units via the **Units** menu
+   - Enable **Cursor Tracking** to keep the cursor centered
+   - Enable **Colorblind Mode** for accessible colors
+
+---
+
+## User Guide
+
+### Loading Log Files
+
+**Supported file extensions:** `.csv`, `.log`, `.txt`, `.mlg`
+
+UltraLog automatically detects the ECU format based on file contents:
+- **Haltech:** Identified by `%DataLog%` header
+- **ECUMaster:** Identified by semicolon/tab-delimited CSV with channel paths
+- **Speeduino/rusEFI:** Identified by `MLVLG` binary header
+
+**Loading multiple files:**
+- Each file opens in its own tab
+- Switch between tabs by clicking them
+- Close tabs with the × button
+- The same file cannot be loaded twice
+
+### Visualizing Data
+
+**Selecting channels:**
+1. Use the search box to filter channels by name
+2. Click a channel name to add it to the chart (turns blue when selected)
+3. Click again to remove it from the chart
+4. Up to 10 channels can be displayed simultaneously
+
+**Understanding the chart:**
+- All channels are normalized to 0-1 range for easy comparison
+- The legend shows:
+  - Channel name with color indicator
+  - Min/Max values for the entire log
+  - Current value at cursor position with units
+
+**Zooming and panning:**
+- Scroll to zoom in/out on the time axis
+- Click and drag to pan the view
+- Double-click to reset zoom
+
+### Timeline and Playback
+
+**Timeline controls (bottom of window):**
+- **Play/Pause** - Start or pause data playback
+- **Stop** - Stop playback and return to beginning
+- **Speed selector** - Choose playback speed (0.25x to 8x)
+- **Timeline scrubber** - Drag to seek through the data
+- **Time input** - Type a specific time in seconds
+
+**Cursor tracking:**
+When enabled (View menu → Cursor Tracking), the chart automatically scrolls to keep the cursor centered as you scrub through data.
+
+### Unit Preferences
+
+Access via **Units** menu. Changes apply immediately to all displayed values.
+
+| Category | Options |
+|----------|---------|
+| Temperature | Kelvin, Celsius, Fahrenheit |
+| Pressure | kPa, PSI, Bar |
+| Speed | km/h, mph |
+| Distance | km, miles |
+| Fuel Economy | L/100km, MPG |
+| Volume | Liters, Gallons |
+| Flow Rate | L/min, GPM |
+| Acceleration | m/s², g |
+
+**Note:** Unit conversion is applied at display time only - original data is never modified.
+
+### Field Normalization
+
+Field normalization maps ECU-specific channel names to standardized names, making it easier to compare data across different ECU systems.
+
+**Enable/Disable:** View menu → Field Normalization
+
+**Example mappings:**
+- "Act_AFR", "AFR1", "Aft" → "AFR"
+- "MAP", "Boost_Press" → "Manifold Pressure"
+- "RPM", "Engine_Speed" → "Engine RPM"
+
+**Custom mappings:**
+1. Open View menu → Normalization Editor
+2. Add custom source → target mappings
+3. Changes apply immediately to channel names
+
+### Exporting Charts
+
+**PNG Export:**
+1. File menu → Export → PNG
+2. Choose save location
+3. Current chart view is saved as a PNG image
+
+**PDF Export:**
+1. File menu → Export → PDF
+2. Choose save location
+3. Chart is exported as a PDF document
+
+### Scatter Plot Tool
+
+The scatter plot tool visualizes the relationship between two channels.
+
+**To use:**
+1. Click the tool switcher (top-right area) and select "Scatter Plot"
+2. Select X-axis channel from the dropdown
+3. Select Y-axis channel from the dropdown
+4. Data points are plotted showing correlation between the two channels
+
+**Use cases:**
+- Correlate AFR vs. manifold pressure
+- Compare throttle position vs. engine load
+- Identify tuning anomalies
+
+### Accessibility Features
+
+**Colorblind Mode:**
+- Enable via View menu → Colorblind Mode
+- Uses Wong's optimized 8-color palette
+- Designed to be distinguishable for deuteranopia, protanopia, and tritanopia
+
+**Standard color palette:**
+Blue, Orange, Green, Red, Purple, Brown, Pink, Gray, Yellow, Cyan
+
+**Colorblind palette:**
+Black, Orange, Sky Blue, Bluish Green, Yellow, Blue, Vermillion, Reddish Purple
+
+---
+
+## Keyboard Shortcuts
+
+| Action | Shortcut |
+|--------|----------|
+| Open file | `Ctrl/Cmd + O` |
+| Close tab | `Ctrl/Cmd + W` |
+| Export PNG | `Ctrl/Cmd + E` |
+| Play/Pause | `Space` |
+| Stop | `Escape` |
+
+---
 
 ## Tech Stack
 
-- **Language:** Rust
-- **GUI Framework:** [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) / [egui](https://github.com/emilk/egui)
-- **Charting:** [egui_plot](https://github.com/emilk/egui/tree/master/crates/egui_plot)
-- **File Dialogs:** [rfd](https://github.com/PolyMeilex/rfd)
-- **Serialization:** serde / serde_json
-- **Error Handling:** thiserror / anyhow
-- **Logging:** tracing / tracing-subscriber
+| Component | Technology |
+|-----------|------------|
+| Language | Rust (Edition 2021) |
+| GUI Framework | [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) / [egui](https://github.com/emilk/egui) 0.29 |
+| Charting | [egui_plot](https://github.com/emilk/egui/tree/master/crates/egui_plot) 0.29 |
+| File Dialogs | [rfd](https://github.com/PolyMeilex/rfd) 0.15 |
+| Image Processing | [image](https://github.com/image-rs/image) 0.25 |
+| PDF Generation | [printpdf](https://github.com/fschutt/printpdf) 0.7 |
+| Serialization | serde / serde_json 1.0 |
+| Error Handling | thiserror 2.0 / anyhow 1.0 |
+| Logging | tracing / tracing-subscriber 0.3 |
+
+---
 
 ## Development
 
 ```bash
-# Run in debug mode
+# Run in debug mode (faster compile, slower runtime)
 cargo run
 
-# Run with release optimizations
+# Run in release mode (slower compile, faster runtime)
 cargo run --release
+
+# Run the parser test utility
+cargo run --bin test_parser -- path/to/logfile.csv
 
 # Run tests
 cargo test
 
-# Check formatting
+# Check code formatting
 cargo fmt --all -- --check
 
-# Run clippy lints
+# Run lints
 cargo clippy -- -D warnings
 ```
+
+### Project Structure
+
+```
+UltraLog/
+├── src/
+│   ├── main.rs          # Application entry point
+│   ├── app.rs           # Main application state and logic
+│   ├── state.rs         # Core data types and structures
+│   ├── units.rs         # Unit conversion system
+│   ├── normalize.rs     # Field name normalization
+│   ├── parsers/         # ECU format parsers
+│   │   ├── haltech.rs   # Haltech CSV parser
+│   │   ├── ecumaster.rs # ECUMaster CSV parser
+│   │   └── speeduino.rs # Speeduino MLG parser
+│   └── ui/              # User interface components
+│       ├── sidebar.rs   # File list and options
+│       ├── channels.rs  # Channel selection panel
+│       ├── chart.rs     # Main chart and LTTB algorithm
+│       ├── timeline.rs  # Playback controls
+│       └── ...
+├── assets/              # Icons and fonts
+├── exampleLogs/         # Sample log files for testing
+└── Cargo.toml           # Project manifest
+```
+
+---
+
+## Troubleshooting
+
+### "File format not recognized"
+- Ensure the file is from a supported ECU system
+- For ECUMaster, export to CSV from EMU Pro software (native `.emuprolog` not supported)
+- Check that the file is not corrupted
+
+### "Application won't start on macOS"
+- Right-click the application and select "Open"
+- Go to System Preferences → Security & Privacy and allow the app
+- If downloaded from the internet, you may need to remove the quarantine flag:
+  ```bash
+  xattr -d com.apple.quarantine /path/to/ultralog
+  ```
+
+### "Chart is slow or laggy"
+- UltraLog handles large files well, but extremely large files (100MB+) may need a moment to process
+- Try closing other applications to free up memory
+- Ensure you're running the release build, not debug
+
+### "Channels show wrong units"
+- Check your Unit Preferences in the Units menu
+- Some ECU systems report data in specific units - UltraLog attempts to convert automatically but may need manual adjustment
+
+### "My ECU format isn't supported"
+- Open an issue on [GitHub](https://github.com/SomethingNew71/UltraLog/issues) with a sample log file
+- Include the ECU system name and software version used to export
+
+---
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
+---
+
 ## Author
 
-Cole Gentry
+**Cole Gentry**
+
+- GitHub: [@SomethingNew71](https://github.com/SomethingNew71)
+- Website: [Classic Mini DIY](https://classicminidiy.com)
+
+---
 
 ## Related Projects
 
-- [Classic Mini DIY](https://classicminidiy.com) - Classic Mini enthusiast website with tools and resources
+- [Classic Mini DIY](https://classicminidiy.com) - Classic Mini enthusiast website with tools, calculators, and resources
+
+---
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## Acknowledgments
+
+- [egui](https://github.com/emilk/egui) - The immediate mode GUI library that makes this possible
+- Wong's colorblind-safe palette for accessibility research
+- The automotive tuning community for feedback and feature requests
