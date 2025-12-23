@@ -96,3 +96,62 @@ pub struct CacheKey {
     pub file_index: usize,
     pub channel_index: usize,
 }
+
+// ============================================================================
+// Tool/View Types
+// ============================================================================
+
+/// The currently active tool/view in the application
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum ActiveTool {
+    /// Standard log viewer with time-series chart
+    #[default]
+    LogViewer,
+    /// Scatter plot view for comparing two variables with color coding
+    ScatterPlot,
+}
+
+impl ActiveTool {
+    /// Get the display name for this tool
+    pub fn name(&self) -> &'static str {
+        match self {
+            ActiveTool::LogViewer => "Log Viewer",
+            ActiveTool::ScatterPlot => "Scatter Plots",
+        }
+    }
+}
+
+/// A selected point on a heatmap
+#[derive(Clone, Default)]
+pub struct SelectedHeatmapPoint {
+    /// X axis value
+    pub x_value: f64,
+    /// Y axis value
+    pub y_value: f64,
+    /// Hit count at this point
+    pub hits: u32,
+}
+
+/// Configuration for a single scatter plot panel
+#[derive(Clone, Default)]
+pub struct ScatterPlotConfig {
+    /// File index for the data source
+    pub file_index: Option<usize>,
+    /// Channel index for X axis
+    pub x_channel: Option<usize>,
+    /// Channel index for Y axis
+    pub y_channel: Option<usize>,
+    /// Channel index for Z axis (color coding)
+    pub z_channel: Option<usize>,
+    /// Currently selected point (persisted on click)
+    pub selected_point: Option<SelectedHeatmapPoint>,
+}
+
+/// State for the scatter plot view (dual plots)
+#[derive(Clone, Default)]
+pub struct ScatterPlotState {
+    /// Configuration for the left scatter plot
+    pub left: ScatterPlotConfig,
+    /// Configuration for the right scatter plot
+    pub right: ScatterPlotConfig,
+}

@@ -78,7 +78,7 @@ static NORMALIZATION_MAP: LazyLock<HashMap<&'static str, Vec<&'static str>>> =
 
         // Coolant Temperature
         map.insert(
-            "Coolant",
+            "Coolant Temp",
             vec![
                 "Coolant",
                 "CLT",
@@ -88,6 +88,7 @@ static NORMALIZATION_MAP: LazyLock<HashMap<&'static str, Vec<&'static str>>> =
                 "Coolant Temperature",
                 "CoolantTemp",
                 "coolantTemp",
+                "Coolant Temp",
             ],
         );
 
@@ -379,6 +380,79 @@ pub fn get_display_name(name: &str, show_original: bool) -> String {
     } else {
         normalized
     }
+}
+
+/// Check if a channel name has a known normalization mapping.
+/// Returns true if the name exists in the normalization mappings (built-in or custom).
+pub fn has_normalization(name: &str, custom_mappings: Option<&HashMap<String, String>>) -> bool {
+    let name_lower = name.to_lowercase();
+
+    // Check custom mappings first
+    if let Some(custom) = custom_mappings {
+        if custom.contains_key(&name_lower) || custom.contains_key(name) {
+            return true;
+        }
+        // Check path-stripped version
+        if let Some(last_segment) = name.rsplit('/').next() {
+            let segment_lower = last_segment.to_lowercase();
+            if custom.contains_key(&segment_lower) {
+                return true;
+            }
+        }
+    }
+
+    // Check built-in mappings
+    if REVERSE_MAP.contains_key(&name_lower) {
+        return true;
+    }
+
+    // Check path-stripped version
+    if let Some(last_segment) = name.rsplit('/').next() {
+        let segment_lower = last_segment.to_lowercase();
+        if REVERSE_MAP.contains_key(&segment_lower) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Sort channel indices by: normalized fields first, then alphabetically by display name.
+/// Returns a sorted vector of (original_index, display_name, is_normalized).
+pub fn sort_channels_by_priority<F>(
+    channel_count: usize,
+    get_original_name: F,
+    field_normalization: bool,
+    custom_mappings: Option<&HashMap<String, String>>,
+) -> Vec<(usize, String, bool)>
+where
+    F: Fn(usize) -> String,
+{
+    let mut channels: Vec<(usize, String, bool)> = (0..channel_count)
+        .map(|idx| {
+            let original_name = get_original_name(idx);
+            let display_name = if field_normalization {
+                normalize_channel_name_with_custom(&original_name, custom_mappings)
+            } else {
+                original_name.clone()
+            };
+            let is_normalized = has_normalization(&original_name, custom_mappings);
+            (idx, display_name, is_normalized)
+        })
+        .collect();
+
+    // Sort: normalized channels first, then alphabetically by display name
+    channels.sort_by(|a, b| {
+        // First sort by is_normalized (true comes before false)
+        match (a.2, b.2) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            // If both have same normalization status, sort alphabetically (case-insensitive)
+            _ => a.1.to_lowercase().cmp(&b.1.to_lowercase()),
+        }
+    });
+
+    channels
 }
 
 #[cfg(test)]

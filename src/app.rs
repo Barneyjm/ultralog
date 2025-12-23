@@ -12,8 +12,8 @@ use std::thread;
 
 use crate::parsers::{EcuMaster, EcuType, Haltech, Parseable, Speeduino};
 use crate::state::{
-    CacheKey, LoadResult, LoadedFile, LoadingState, SelectedChannel, CHART_COLORS,
-    COLORBLIND_COLORS, MAX_CHANNELS,
+    ActiveTool, CacheKey, LoadResult, LoadedFile, LoadingState, ScatterPlotState,
+    SelectedChannel, CHART_COLORS, COLORBLIND_COLORS, MAX_CHANNELS,
 };
 use crate::units::UnitPreferences;
 
@@ -81,6 +81,11 @@ pub struct UltraLogApp {
     pub(crate) norm_editor_source: String,
     /// Input field for new normalized name in editor
     pub(crate) norm_editor_target: String,
+    // === Tool/View Selection ===
+    /// Currently active tool/view
+    pub(crate) active_tool: ActiveTool,
+    /// State for the scatter plot view
+    pub(crate) scatter_plot_state: ScatterPlotState,
 }
 
 impl Default for UltraLogApp {
@@ -112,6 +117,8 @@ impl Default for UltraLogApp {
             show_normalization_editor: false,
             norm_editor_source: String::new(),
             norm_editor_target: String::new(),
+            active_tool: ActiveTool::default(),
+            scatter_plot_state: ScatterPlotState::default(),
         }
     }
 }
@@ -657,56 +664,82 @@ impl eframe::App for UltraLogApp {
                 self.render_menu_bar(ui);
             });
 
+        // Tool switcher panel (pill tabs)
+        let tool_switcher_frame = egui::Frame::none()
+            .fill(egui::Color32::from_rgb(35, 35, 35))
+            .inner_margin(egui::Margin {
+                left: 10.0,
+                right: 10.0,
+                top: 8.0,
+                bottom: 8.0,
+            });
+
+        egui::TopBottomPanel::top("tool_switcher")
+            .frame(tool_switcher_frame)
+            .show(ctx, |ui| {
+                self.render_tool_switcher(ui);
+            });
+
         // Panel background color (matches drop zone card)
         let panel_bg = egui::Color32::from_rgb(45, 45, 45);
         let panel_frame = egui::Frame::none()
             .fill(panel_bg)
             .inner_margin(egui::Margin::symmetric(10.0, 10.0));
 
-        // Left sidebar panel
+        // Left sidebar panel (always visible)
         egui::SidePanel::left("files_panel")
             .default_width(200.0)
             .resizable(true)
-            .frame(panel_frame)
+            .frame(panel_frame.clone())
             .show(ctx, |ui| {
                 self.render_sidebar(ui);
             });
 
-        // Right panel for channel selection
-        egui::SidePanel::right("channels_panel")
-            .default_width(300.0)
-            .min_width(200.0)
-            .resizable(true)
-            .frame(panel_frame)
-            .show(ctx, |ui| {
-                self.render_channel_selection(ui);
-            });
-
-        // Bottom panel for timeline scrubber (render before central to claim space)
-        if self.time_range.is_some() && !self.selected_channels.is_empty() {
-            egui::TopBottomPanel::bottom("timeline_panel")
-                .resizable(false)
-                .min_height(60.0)
+        // Right panel for channel selection (only in Log Viewer mode)
+        if self.active_tool == ActiveTool::LogViewer {
+            egui::SidePanel::right("channels_panel")
+                .default_width(300.0)
+                .min_width(200.0)
+                .resizable(true)
+                .frame(panel_frame)
                 .show(ctx, |ui| {
-                    ui.add_space(5.0);
-                    self.render_record_indicator(ui);
-                    ui.separator();
-                    self.render_timeline_scrubber(ui);
-                    ui.add_space(5.0);
+                    self.render_channel_selection(ui);
                 });
+
+            // Bottom panel for timeline scrubber (only in Log Viewer mode)
+            if self.time_range.is_some() && !self.selected_channels.is_empty() {
+                egui::TopBottomPanel::bottom("timeline_panel")
+                    .resizable(false)
+                    .min_height(60.0)
+                    .show(ctx, |ui| {
+                        ui.add_space(5.0);
+                        self.render_record_indicator(ui);
+                        ui.separator();
+                        self.render_timeline_scrubber(ui);
+                        ui.add_space(5.0);
+                    });
+            }
         }
 
-        // Main content area
+        // Main content area - render based on active tool
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Selected channels at top
-            ui.add_space(10.0);
-            self.render_selected_channels(ui);
+            match self.active_tool {
+                ActiveTool::LogViewer => {
+                    // Selected channels at top
+                    ui.add_space(10.0);
+                    self.render_selected_channels(ui);
 
-            ui.add_space(10.0);
-            ui.separator();
+                    ui.add_space(10.0);
+                    ui.separator();
 
-            // Chart takes remaining space
-            self.render_chart(ui);
+                    // Chart takes remaining space
+                    self.render_chart(ui);
+                }
+                ActiveTool::ScatterPlot => {
+                    ui.add_space(10.0);
+                    self.render_scatter_plot_view(ui);
+                }
+            }
         });
     }
 }

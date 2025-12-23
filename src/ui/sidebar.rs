@@ -3,7 +3,7 @@
 use eframe::egui;
 
 use crate::app::UltraLogApp;
-use crate::state::LoadingState;
+use crate::state::{ActiveTool, LoadingState};
 use crate::ui::icons::draw_upload_icon;
 
 impl UltraLogApp {
@@ -171,8 +171,11 @@ impl UltraLogApp {
             // Reverse order since we're bottom-up
             ui.add_space(10.0);
 
-            // Only show options when we have data to view
-            if !self.files.is_empty() && !self.selected_channels.is_empty() {
+            // Only show options when we have data to view and are in Log Viewer mode
+            if !self.files.is_empty()
+                && !self.selected_channels.is_empty()
+                && self.active_tool == ActiveTool::LogViewer
+            {
                 egui::Frame::none()
                     .fill(egui::Color32::from_rgb(35, 35, 35))
                     .rounding(8.0)

@@ -10,6 +10,8 @@
 //! - `icons` - Custom icon drawing utilities
 //! - `export` - Chart export functionality (PNG, PDF)
 //! - `normalization_editor` - Field normalization customization window
+//! - `tool_switcher` - Pill-style tab navigation between tools
+//! - `scatter_plot` - Scatter plot visualization view
 
 pub mod channels;
 pub mod chart;
@@ -17,6 +19,8 @@ pub mod export;
 pub mod icons;
 pub mod menu;
 pub mod normalization_editor;
+pub mod scatter_plot;
 pub mod sidebar;
 pub mod timeline;
 pub mod toast;
+pub mod tool_switcher;

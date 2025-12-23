@@ -3,7 +3,7 @@
 use eframe::egui;
 
 use crate::app::UltraLogApp;
-use crate::normalize::normalize_channel_name_with_custom;
+use crate::normalize::{normalize_channel_name_with_custom, sort_channels_by_priority};
 use crate::state::MAX_CHANNELS;
 
 impl UltraLogApp {
@@ -41,23 +41,21 @@ impl UltraLogApp {
             let mut channel_to_add: Option<(usize, usize)> = None;
             let mut channel_to_remove: Option<usize> = None;
 
+            // Sort channels: normalized fields first, then alphabetically
+            let sorted_channels = sort_channels_by_priority(
+                file.log.channels.len(),
+                |idx| file.log.channels[idx].name(),
+                self.field_normalization,
+                Some(&self.custom_normalizations),
+            );
+
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
 
-                    for (channel_index, channel) in file.log.channels.iter().enumerate() {
-                        let original_name = channel.name();
-
-                        // Get display name (normalized or original based on setting)
-                        let display_name = if self.field_normalization {
-                            normalize_channel_name_with_custom(
-                                &original_name,
-                                Some(&self.custom_normalizations),
-                            )
-                        } else {
-                            original_name.clone()
-                        };
+                    for (channel_index, display_name, _is_normalized) in &sorted_channels {
+                        let original_name = file.log.channels[*channel_index].name();
 
                         // Filter by search (search both original and normalized names)
                         if !search_lower.is_empty()
@@ -69,7 +67,7 @@ impl UltraLogApp {
 
                         // Check if already selected and get its index in selected_channels
                         let selected_idx = self.selected_channels.iter().position(|c| {
-                            c.file_index == file_index && c.channel_index == channel_index
+                            c.file_index == file_index && c.channel_index == *channel_index
                         });
                         let is_selected = selected_idx.is_some();
 
@@ -88,7 +86,7 @@ impl UltraLogApp {
                                 channel_to_remove = Some(idx);
                             } else {
                                 // Not selected - add it
-                                channel_to_add = Some((file_index, channel_index));
+                                channel_to_add = Some((file_index, *channel_index));
                             }
                         }
                     }
