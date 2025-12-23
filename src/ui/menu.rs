@@ -40,7 +40,7 @@ impl UltraLogApp {
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter(
                             "Log Files",
-                            &["csv", "log", "txt", "mlg", "hlgzip", "daq", "llg"],
+                            &["csv", "log", "txt", "mlg"],
                         )
                         .pick_file()
                     {
@@ -131,7 +131,7 @@ impl UltraLogApp {
                     .insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
 
                 // Temperature submenu
-                ui.menu_button("🌡  Temperature", |ui| {
+                ui.menu_button("°C  Temperature", |ui| {
                     // Increase font size for submenu items
                     ui.style_mut()
                         .text_styles

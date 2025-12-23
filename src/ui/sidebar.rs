@@ -85,19 +85,43 @@ impl UltraLogApp {
             ui.separator();
             ui.add_space(5.0);
 
-            // Add more files button (compact when files exist)
+            // Add more files button (styled to match drop zone button)
             ui.add_enabled_ui(!is_loading, |ui| {
-                if ui.button("+ Add File").clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
-                        .add_filter(
-                            "Log Files",
-                            &["csv", "log", "txt", "mlg", "hlgzip", "daq", "llg"],
-                        )
-                        .pick_file()
+                let primary_color = egui::Color32::from_rgb(113, 120, 78); // Olive green
+
+                ui.vertical_centered(|ui| {
+                    let button_response = egui::Frame::none()
+                        .fill(primary_color)
+                        .rounding(6.0)
+                        .inner_margin(egui::vec2(16.0, 8.0))
+                        .show(ui, |ui| {
+                            ui.label(
+                                egui::RichText::new("+ Add File")
+                                    .color(egui::Color32::WHITE)
+                                    .size(14.0),
+                            );
+                        });
+
+                    if button_response
+                        .response
+                        .interact(egui::Sense::click())
+                        .clicked()
                     {
-                        self.start_loading_file(path);
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter(
+                                "Log Files",
+                                &["csv", "log", "txt", "mlg"],
+                            )
+                            .pick_file()
+                        {
+                            self.start_loading_file(path);
+                        }
                     }
-                }
+
+                    if button_response.response.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                });
             });
         } else if !is_loading {
             // Nice drop zone when no files loaded
