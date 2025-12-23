@@ -41,7 +41,7 @@ impl UltraLogApp {
                     .clicked()
                 {
                     if let Some(path) = rfd::FileDialog::new()
-                        .add_filter("Log Files", &["csv", "log", "txt", "mlg"])
+                        .add_filter("Log Files", &["csv", "log", "txt", "mlg", "hlgzip"])
                         .pick_file()
                     {
                         self.start_loading_file(path);

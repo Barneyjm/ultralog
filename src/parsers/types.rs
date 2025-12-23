@@ -58,7 +58,7 @@ impl Channel {
         match self {
             Channel::Haltech(h) => h.r#type.as_ref().to_string(),
             Channel::EcuMaster(e) => e.path.clone(),
-            Channel::Speeduino(_) => "Speeduino".to_string(),
+            Channel::Speeduino(_) => "Speeduino/rusEFI".to_string(),
         }
     }
 
@@ -194,7 +194,7 @@ impl EcuType {
             EcuType::MaxxEcu => "MaxxECU",
             EcuType::MotEc => "MoTeC",
             EcuType::Link => "Link",
-            EcuType::Speeduino => "Speeduino",
+            EcuType::Speeduino => "Speeduino/rusEFI",
             EcuType::Unknown => "Unknown",
         }
     }

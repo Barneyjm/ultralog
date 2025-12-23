@@ -1,6 +1,6 @@
-//! Speeduino MegaLogViewer (.mlg) binary format parser
+//! Speeduino/rusEFI MegaLogViewer (.mlg) binary format parser
 //!
-//! Speeduino uses the MegaLogViewer binary format for data logging.
+//! Speeduino and rusEFI both use the MegaLogViewer binary format for data logging.
 //! Format structure based on mlg-converter reference:
 //! - Header: "MLVLG" (6 bytes including version byte)
 //! - Format version (int16) and metadata
@@ -511,7 +511,7 @@ impl Speeduino {
 impl Parseable for Speeduino {
     fn parse(&self, _data: &str) -> Result<Log, Box<dyn Error>> {
         // This method is for text-based parsing
-        // Speeduino uses binary format, so this will return an error
-        Err("Speeduino MLG files are binary format. Use parse_binary() instead.".into())
+        // Speeduino/rusEFI uses binary MLG format, so this will return an error
+        Err("Speeduino/rusEFI MLG files are binary format. Use parse_binary() instead.".into())
     }
 }

@@ -183,19 +183,30 @@ impl UltraLogApp {
 
     /// Synchronously load a file (runs in background thread)
     fn load_file_sync(path: PathBuf) -> LoadResult {
-        // First try reading as binary to detect Speeduino format
+        // First try reading as binary to detect Speeduino/rusEFI MLG format
         let binary_data = match fs::read(&path) {
             Ok(d) => d,
             Err(e) => return LoadResult::Error(format!("Failed to read file: {}", e)),
         };
 
+        // Check for Haltech HEPS format (.hlgzip) - proprietary compressed format
+        if binary_data.len() >= 4 && &binary_data[0..4] == b"HEPS" {
+            return LoadResult::Error(
+                "This is a Haltech .hlgzip file which uses proprietary compression.\n\n\
+                To use this log in UltraLog, please export it as CSV from Haltech's ESP or NSP software:\n\
+                1. Open the .hlgzip file in Haltech ESP/NSP\n\
+                2. Go to File → Export → CSV\n\
+                3. Load the exported .csv file in UltraLog".to_string()
+            );
+        }
+
         // Auto-detect file format and parse
         let (log, ecu_type) = if Speeduino::detect(&binary_data) {
-            // Speeduino MLG format detected (binary)
+            // Speeduino/rusEFI MLG format detected (binary)
             match Speeduino::parse_binary(&binary_data) {
                 Ok(l) => (l, EcuType::Speeduino),
                 Err(e) => {
-                    return LoadResult::Error(format!("Failed to parse Speeduino file: {}", e))
+                    return LoadResult::Error(format!("Failed to parse Speeduino/rusEFI MLG file: {}", e))
                 }
             }
         } else {
