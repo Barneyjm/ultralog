@@ -62,6 +62,8 @@ pub struct UltraLogApp {
     // === Accessibility ===
     /// When true, use colorblind-friendly color palette
     pub(crate) color_blind_mode: bool,
+    /// When true, normalize field names to standard names
+    pub(crate) field_normalization: bool,
     // === Chart View State ===
     /// Whether user has interacted with chart zoom/pan (false = use initial zoomed view)
     pub(crate) chart_interacted: bool,
@@ -70,6 +72,15 @@ pub struct UltraLogApp {
     // === Unit Preferences ===
     /// User preferences for display units
     pub(crate) unit_preferences: UnitPreferences,
+    // === Custom Field Normalization ===
+    /// Custom user-defined field name mappings (source name -> normalized name)
+    pub(crate) custom_normalizations: HashMap<String, String>,
+    /// Whether to show the normalization editor window
+    pub(crate) show_normalization_editor: bool,
+    /// Input field for new source name in editor
+    pub(crate) norm_editor_source: String,
+    /// Input field for new normalized name in editor
+    pub(crate) norm_editor_target: String,
 }
 
 impl Default for UltraLogApp {
@@ -93,9 +104,14 @@ impl Default for UltraLogApp {
             last_frame_time: None,
             playback_speed: 1.0,
             color_blind_mode: false,
+            field_normalization: true, // Enabled by default for better readability
             chart_interacted: false,
             initial_view_seconds: 60.0, // Start with 60 second view
             unit_preferences: UnitPreferences::default(),
+            custom_normalizations: HashMap::new(),
+            show_normalization_editor: false,
+            norm_editor_source: String::new(),
+            norm_editor_target: String::new(),
         }
     }
 }
@@ -570,6 +586,11 @@ impl UltraLogApp {
             return;
         }
 
+        // Don't handle shortcuts when a text field or other widget has keyboard focus
+        if ctx.memory(|m| m.focused().is_some()) {
+            return;
+        }
+
         // Spacebar to toggle play/pause
         ctx.input(|i| {
             if i.key_pressed(egui::Key::Space) {
@@ -618,6 +639,9 @@ impl eframe::App for UltraLogApp {
 
         // Toast notifications
         self.render_toast(ctx);
+
+        // Normalization editor window
+        self.render_normalization_editor(ctx);
 
         // Menu bar at top with padding
         let menu_frame = egui::Frame::none().inner_margin(egui::Margin {

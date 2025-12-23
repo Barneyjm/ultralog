@@ -179,10 +179,9 @@ impl UltraLogApp {
                     .inner_margin(10.0)
                     .show(ui, |ui| {
                         // Cursor tracking checkbox
-                        ui.checkbox(&mut self.cursor_tracking, "Cursor Tracking");
+                        ui.checkbox(&mut self.cursor_tracking, "🎯  Cursor Tracking");
                         ui.label(
                             egui::RichText::new("Keep cursor centered while scrubbing")
-                                .small()
                                 .color(egui::Color32::GRAY),
                         );
 
@@ -202,10 +201,30 @@ impl UltraLogApp {
                         ui.add_space(4.0);
 
                         // Color blind mode checkbox
-                        ui.checkbox(&mut self.color_blind_mode, "Color Blind Mode");
+                        ui.checkbox(&mut self.color_blind_mode, "👁  Color Blind Mode");
                         ui.label(
                             egui::RichText::new("Use accessible color palette")
-                                .small()
+                                .color(egui::Color32::GRAY),
+                        );
+
+                        ui.add_space(8.0);
+                        ui.separator();
+                        ui.add_space(4.0);
+
+                        // Field normalization checkbox with right-aligned Edit button
+                        ui.horizontal(|ui| {
+                            ui.checkbox(&mut self.field_normalization, "📝  Field Normalization");
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui.small_button("Edit").clicked() {
+                                        self.show_normalization_editor = true;
+                                    }
+                                },
+                            );
+                        });
+                        ui.label(
+                            egui::RichText::new("Standardize channel names across ECU types")
                                 .color(egui::Color32::GRAY),
                         );
                     });

@@ -3,6 +3,7 @@
 use eframe::egui;
 
 use crate::app::UltraLogApp;
+use crate::normalize::normalize_channel_name_with_custom;
 use crate::state::MAX_CHANNELS;
 
 impl UltraLogApp {
@@ -46,10 +47,22 @@ impl UltraLogApp {
                     ui.set_width(ui.available_width());
 
                     for (channel_index, channel) in file.log.channels.iter().enumerate() {
-                        let name = channel.name();
+                        let original_name = channel.name();
 
-                        // Filter by search
-                        if !search_lower.is_empty() && !name.to_lowercase().contains(&search_lower)
+                        // Get display name (normalized or original based on setting)
+                        let display_name = if self.field_normalization {
+                            normalize_channel_name_with_custom(
+                                &original_name,
+                                Some(&self.custom_normalizations),
+                            )
+                        } else {
+                            original_name.clone()
+                        };
+
+                        // Filter by search (search both original and normalized names)
+                        if !search_lower.is_empty()
+                            && !original_name.to_lowercase().contains(&search_lower)
+                            && !display_name.to_lowercase().contains(&search_lower)
                         {
                             continue;
                         }
@@ -62,9 +75,9 @@ impl UltraLogApp {
 
                         // Build the label with checkmark prefix if selected
                         let label_text = if is_selected {
-                            format!("[*] {}", name)
+                            format!("[*] {}", display_name)
                         } else {
-                            format!("[ ] {}", name)
+                            format!("[ ] {}", display_name)
                         };
 
                         let response = ui.selectable_label(is_selected, label_text);
@@ -107,12 +120,22 @@ impl UltraLogApp {
         ui.separator();
 
         let mut channel_to_remove: Option<usize> = None;
+        let use_normalization = self.field_normalization;
+        let custom_mappings = &self.custom_normalizations;
 
         egui::ScrollArea::horizontal().show(ui, |ui| {
             ui.horizontal(|ui| {
                 for (i, selected) in self.selected_channels.iter().enumerate() {
                     let color = self.get_channel_color(selected.color_index);
                     let color32 = egui::Color32::from_rgb(color[0], color[1], color[2]);
+
+                    // Get display name (normalized or original based on setting)
+                    let channel_name = selected.channel.name();
+                    let display_name = if use_normalization {
+                        normalize_channel_name_with_custom(&channel_name, Some(custom_mappings))
+                    } else {
+                        channel_name
+                    };
 
                     egui::Frame::none()
                         .fill(egui::Color32::from_rgb(40, 40, 40))
@@ -123,9 +146,7 @@ impl UltraLogApp {
                             ui.vertical(|ui| {
                                 ui.horizontal(|ui| {
                                     ui.label(
-                                        egui::RichText::new(selected.channel.name())
-                                            .strong()
-                                            .color(color32),
+                                        egui::RichText::new(&display_name).strong().color(color32),
                                     );
                                     if ui.small_button("x").clicked() {
                                         channel_to_remove = Some(i);
@@ -137,7 +158,6 @@ impl UltraLogApp {
                                         "Type: {}",
                                         selected.channel.type_name()
                                     ))
-                                    .small()
                                     .color(egui::Color32::GRAY),
                                 );
 
@@ -160,7 +180,6 @@ impl UltraLogApp {
                                             "Range: {:.0}{} - {:.0}{}",
                                             conv_min, unit_str, conv_max, unit_str
                                         ))
-                                        .small()
                                         .color(egui::Color32::GRAY),
                                     );
                                 }

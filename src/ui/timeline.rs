@@ -20,13 +20,11 @@ impl UltraLogApp {
         ui.horizontal(|ui| {
             ui.label(
                 egui::RichText::new(Self::format_time(min_time))
-                    .small()
                     .color(egui::Color32::LIGHT_GRAY),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new(Self::format_time(max_time))
-                        .small()
                         .color(egui::Color32::LIGHT_GRAY),
                 );
             });
@@ -117,7 +115,6 @@ impl UltraLogApp {
             // Playback speed selector
             ui.label(
                 egui::RichText::new("Speed:")
-                    .small()
                     .color(egui::Color32::GRAY),
             );
 

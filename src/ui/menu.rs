@@ -1,4 +1,4 @@
-//! Menu bar UI components (File, Units, Help menus).
+//! Menu bar UI components (File, View, Units, Help menus).
 
 use eframe::egui;
 
@@ -38,7 +38,10 @@ impl UltraLogApp {
                     .clicked()
                 {
                     if let Some(path) = rfd::FileDialog::new()
-                        .add_filter("Log Files", &["csv", "mlg"])
+                        .add_filter(
+                            "Log Files",
+                            &["csv", "log", "txt", "mlg", "hlgzip", "daq", "llg"],
+                        )
                         .pick_file()
                     {
                         self.start_loading_file(path);
@@ -66,6 +69,52 @@ impl UltraLogApp {
                         }
                     });
                 });
+            });
+
+            // View menu
+            ui.menu_button("View", |ui| {
+                ui.set_min_width(180.0);
+
+                // Increase font size for dropdown items
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Button, egui::FontId::proportional(14.0));
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
+
+                // Cursor Tracking toggle
+                if ui
+                    .checkbox(&mut self.cursor_tracking, "🎯  Cursor Tracking")
+                    .clicked()
+                {
+                    ui.close_menu();
+                }
+
+                // Color Blind Mode toggle
+                if ui
+                    .checkbox(&mut self.color_blind_mode, "👁  Color Blind Mode")
+                    .clicked()
+                {
+                    ui.close_menu();
+                }
+
+                ui.separator();
+
+                // Field Normalization toggle
+                if ui
+                    .checkbox(&mut self.field_normalization, "📝  Field Normalization")
+                    .on_hover_text("Standardize channel names across different ECU types")
+                    .clicked()
+                {
+                    ui.close_menu();
+                }
+
+                // Edit mappings button
+                if ui.button("      Edit Mappings...").clicked() {
+                    self.show_normalization_editor = true;
+                    ui.close_menu();
+                }
             });
 
             // Units menu
@@ -376,7 +425,6 @@ impl UltraLogApp {
                 ui.horizontal(|ui| {
                     ui.label(
                         egui::RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION")))
-                            .small()
                             .color(egui::Color32::GRAY),
                     );
                 });

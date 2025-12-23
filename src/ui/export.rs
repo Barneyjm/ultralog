@@ -8,6 +8,7 @@ use std::io::BufWriter;
 use ::image::{Rgba, RgbaImage};
 
 use crate::app::UltraLogApp;
+use crate::normalize::normalize_channel_name_with_custom;
 
 impl UltraLogApp {
     /// Export the current chart view as PNG
@@ -314,9 +315,17 @@ impl UltraLogApp {
                 None,
             ));
 
+            // Get display name (normalized or original based on setting)
+            let channel_name = selected.channel.name();
+            let display_name = if self.field_normalization {
+                normalize_channel_name_with_custom(&channel_name, Some(&self.custom_normalizations))
+            } else {
+                channel_name
+            };
+
             current_layer.set_fill_color(text_color);
             current_layer.use_text(
-                &selected.channel.name(),
+                &display_name,
                 8.0,
                 Mm(legend_x as f32),
                 Mm(legend_y as f32),

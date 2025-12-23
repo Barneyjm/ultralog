@@ -9,12 +9,14 @@
 //! - `toast` - Toast notification system
 //! - `icons` - Custom icon drawing utilities
 //! - `export` - Chart export functionality (PNG, PDF)
+//! - `normalization_editor` - Field normalization customization window
 
 pub mod channels;
 pub mod chart;
 pub mod export;
 pub mod icons;
 pub mod menu;
+pub mod normalization_editor;
 pub mod sidebar;
 pub mod timeline;
 pub mod toast;

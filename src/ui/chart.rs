@@ -4,6 +4,7 @@ use eframe::egui;
 use egui_plot::{Line, Plot, PlotBounds, PlotPoints, VLine};
 
 use crate::app::UltraLogApp;
+use crate::normalize::normalize_channel_name_with_custom;
 use crate::state::{CacheKey, CHART_COLORS, COLORBLIND_COLORS, MAX_CHART_POINTS};
 
 impl UltraLogApp {
@@ -46,11 +47,18 @@ impl UltraLogApp {
         }
 
         // Pre-compute legend names with current values at cursor position
+        let use_normalization = self.field_normalization;
+        let custom_mappings = &self.custom_normalizations;
         let legend_names: Vec<String> = self
             .selected_channels
             .iter()
             .map(|selected| {
-                let base_name = selected.channel.name();
+                let original_name = selected.channel.name();
+                let base_name = if use_normalization {
+                    normalize_channel_name_with_custom(&original_name, Some(custom_mappings))
+                } else {
+                    original_name
+                };
                 if let Some(record) = self.cursor_record {
                     if let Some(value) = self.get_value_at_record(
                         selected.file_index,
@@ -66,10 +74,10 @@ impl UltraLogApp {
                             format!("{}: {:.2} {}", base_name, converted_value, display_unit)
                         }
                     } else {
-                        base_name.to_string()
+                        base_name
                     }
                 } else {
-                    base_name.to_string()
+                    base_name
                 }
             })
             .collect();
@@ -252,6 +260,17 @@ impl UltraLogApp {
                             let color = self.get_channel_color(selected.color_index);
                             let color32 = egui::Color32::from_rgb(color[0], color[1], color[2]);
 
+                            // Get display name (normalized or original based on setting)
+                            let channel_name = selected.channel.name();
+                            let display_name = if self.field_normalization {
+                                normalize_channel_name_with_custom(
+                                    &channel_name,
+                                    Some(&self.custom_normalizations),
+                                )
+                            } else {
+                                channel_name
+                            };
+
                             if let Some((min_val, max_val)) = self
                                 .get_channel_min_max(selected.file_index, selected.channel_index)
                             {
@@ -277,7 +296,7 @@ impl UltraLogApp {
                                     ui.label(
                                         egui::RichText::new(format!(
                                             "{}: {:.2}{} / {:.2}{}",
-                                            selected.channel.name(),
+                                            display_name,
                                             converted_min,
                                             unit_str,
                                             converted_max,

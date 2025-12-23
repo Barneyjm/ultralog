@@ -9,6 +9,7 @@
 //! - [`parsers`] - ECU log file parsers (Haltech, etc.)
 //! - [`state`] - Core data types and constants
 //! - [`units`] - Unit preference types and conversion utilities
+//! - [`normalize`] - Field name normalization for standardizing channel names
 //! - [`ui`] - User interface components
 //!   - `sidebar` - File list and view options
 //!   - `channels` - Channel selection and display
@@ -19,6 +20,7 @@
 //!   - `icons` - Custom icon drawing utilities
 
 pub mod app;
+pub mod normalize;
 pub mod parsers;
 pub mod state;
 pub mod ui;
