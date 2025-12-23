@@ -155,3 +155,52 @@ pub struct ScatterPlotState {
     /// Configuration for the right scatter plot
     pub right: ScatterPlotConfig,
 }
+
+// ============================================================================
+// Tab Types
+// ============================================================================
+
+/// A tab representing a single log file's view state
+#[derive(Clone)]
+pub struct Tab {
+    /// Index of the file this tab displays
+    pub file_index: usize,
+    /// Display name for the tab (usually filename)
+    pub name: String,
+    /// Channels selected for visualization in this tab
+    pub selected_channels: Vec<SelectedChannel>,
+    /// Channel search/filter text for this tab
+    pub channel_search: String,
+    /// Current cursor position in seconds for this tab
+    pub cursor_time: Option<f64>,
+    /// Current data record index at cursor position
+    pub cursor_record: Option<usize>,
+    /// Whether user has interacted with chart zoom/pan
+    pub chart_interacted: bool,
+    /// Time range for this tab's log file (min, max)
+    pub time_range: Option<(f64, f64)>,
+    /// Scatter plot state for this tab (dual heatmaps)
+    pub scatter_plot_state: ScatterPlotState,
+}
+
+impl Tab {
+    /// Create a new tab for a file
+    pub fn new(file_index: usize, name: String) -> Self {
+        // Initialize scatter plot state with this tab's file index
+        let mut scatter_plot_state = ScatterPlotState::default();
+        scatter_plot_state.left.file_index = Some(file_index);
+        scatter_plot_state.right.file_index = Some(file_index);
+
+        Self {
+            file_index,
+            name,
+            selected_channels: Vec::new(),
+            channel_search: String::new(),
+            cursor_time: None,
+            cursor_record: None,
+            chart_interacted: false,
+            time_range: None,
+            scatter_plot_state,
+        }
+    }
+}

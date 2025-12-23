@@ -7,7 +7,7 @@ use crate::app::UltraLogApp;
 impl UltraLogApp {
     /// Render the timeline scrubber bar
     pub fn render_timeline_scrubber(&mut self, ui: &mut egui::Ui) {
-        let Some((min_time, max_time)) = self.time_range else {
+        let Some((min_time, max_time)) = self.get_time_range() else {
             return;
         };
 
@@ -19,8 +19,7 @@ impl UltraLogApp {
         // Time labels row
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new(Self::format_time(min_time))
-                    .color(egui::Color32::LIGHT_GRAY),
+                egui::RichText::new(Self::format_time(min_time)).color(egui::Color32::LIGHT_GRAY),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
@@ -31,7 +30,7 @@ impl UltraLogApp {
         });
 
         // Full-width slider - set slider_width to use available space
-        let current_time = self.cursor_time.unwrap_or(min_time);
+        let current_time = self.get_cursor_time().unwrap_or(min_time);
         let mut slider_value = current_time;
         let available_width = ui.available_width();
 
@@ -53,8 +52,9 @@ impl UltraLogApp {
             self.is_playing = false;
             self.last_frame_time = None;
 
-            self.cursor_time = Some(slider_value);
-            self.cursor_record = self.find_record_at_time(slider_value);
+            self.set_cursor_time(Some(slider_value));
+            let record = self.find_record_at_time(slider_value);
+            self.set_cursor_record(record);
             // Force repaint to update legend values
             ui.ctx().request_repaint();
         }
@@ -83,10 +83,11 @@ impl UltraLogApp {
                     // Reset frame time when starting playback
                     self.last_frame_time = Some(std::time::Instant::now());
                     // Initialize cursor if not set
-                    if self.cursor_time.is_none() {
-                        if let Some((min, _)) = self.time_range {
-                            self.cursor_time = Some(min);
-                            self.cursor_record = self.find_record_at_time(min);
+                    if self.get_cursor_time().is_none() {
+                        if let Some((min, _)) = self.get_time_range() {
+                            self.set_cursor_time(Some(min));
+                            let record = self.find_record_at_time(min);
+                            self.set_cursor_record(record);
                         }
                     }
                 }
@@ -104,19 +105,17 @@ impl UltraLogApp {
                 self.is_playing = false;
                 self.last_frame_time = None;
                 // Reset cursor to beginning
-                if let Some((min, _)) = self.time_range {
-                    self.cursor_time = Some(min);
-                    self.cursor_record = self.find_record_at_time(min);
+                if let Some((min, _)) = self.get_time_range() {
+                    self.set_cursor_time(Some(min));
+                    let record = self.find_record_at_time(min);
+                    self.set_cursor_record(record);
                 }
             }
 
             ui.separator();
 
             // Playback speed selector
-            ui.label(
-                egui::RichText::new("Speed:")
-                    .color(egui::Color32::GRAY),
-            );
+            ui.label(egui::RichText::new("Speed:").color(egui::Color32::GRAY));
 
             let speed_options = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
             egui::ComboBox::from_id_salt("playback_speed")
@@ -131,7 +130,7 @@ impl UltraLogApp {
             ui.separator();
 
             // Current time display
-            if let Some(time) = self.cursor_time {
+            if let Some(time) = self.get_cursor_time() {
                 ui.label(
                     egui::RichText::new(format!("Time: {}", Self::format_time(time)))
                         .strong()
@@ -141,14 +140,21 @@ impl UltraLogApp {
 
             ui.separator();
 
-            // Record indicator
-            if let Some(record) = self.cursor_record {
-                if let Some(file) = self.files.first() {
-                    let total_records = file.log.data.len();
-                    ui.label(
-                        egui::RichText::new(format!("Record {} of {}", record + 1, total_records))
+            // Record indicator - use active tab's file for record count
+            if let Some(record) = self.get_cursor_record() {
+                if let Some(tab_idx) = self.active_tab {
+                    let file_index = self.tabs[tab_idx].file_index;
+                    if file_index < self.files.len() {
+                        let total_records = self.files[file_index].log.data.len();
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Record {} of {}",
+                                record + 1,
+                                total_records
+                            ))
                             .color(egui::Color32::LIGHT_GRAY),
-                    );
+                        );
+                    }
                 }
             }
         });
@@ -160,7 +166,7 @@ impl UltraLogApp {
             return;
         }
 
-        let Some((min_time, max_time)) = self.time_range else {
+        let Some((min_time, max_time)) = self.get_time_range() else {
             self.is_playing = false;
             return;
         };
@@ -174,23 +180,26 @@ impl UltraLogApp {
         self.last_frame_time = Some(now);
 
         // Advance cursor by delta * playback_speed
-        if let Some(current_time) = self.cursor_time {
+        if let Some(current_time) = self.get_cursor_time() {
             let new_time = current_time + (delta * self.playback_speed);
 
             if new_time >= max_time {
                 // Reached end - stop playback
-                self.cursor_time = Some(max_time);
-                self.cursor_record = self.find_record_at_time(max_time);
+                self.set_cursor_time(Some(max_time));
+                let record = self.find_record_at_time(max_time);
+                self.set_cursor_record(record);
                 self.is_playing = false;
                 self.last_frame_time = None;
             } else {
-                self.cursor_time = Some(new_time);
-                self.cursor_record = self.find_record_at_time(new_time);
+                self.set_cursor_time(Some(new_time));
+                let record = self.find_record_at_time(new_time);
+                self.set_cursor_record(record);
             }
         } else {
             // No cursor set, start from beginning
-            self.cursor_time = Some(min_time);
-            self.cursor_record = self.find_record_at_time(min_time);
+            self.set_cursor_time(Some(min_time));
+            let record = self.find_record_at_time(min_time);
+            self.set_cursor_record(record);
         }
 
         // Request continuous repaint during playback

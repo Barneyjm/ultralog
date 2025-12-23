@@ -88,7 +88,7 @@ impl UltraLogApp {
         let chart_height = (chart_bottom - chart_top) as f64;
 
         // Draw each channel
-        for selected in &self.selected_channels {
+        for selected in self.get_selected_channels() {
             let color = self.get_channel_color(selected.color_index);
             let pixel_color = Rgba([color[0], color[1], color[2], 255]);
 
@@ -197,7 +197,7 @@ impl UltraLogApp {
             let subtitle = format!(
                 "{} | {} channels selected | Time: {:.1}s - {:.1}s",
                 file.name,
-                self.selected_channels.len(),
+                self.get_selected_channels().len(),
                 min_time,
                 max_time
             );
@@ -233,7 +233,7 @@ impl UltraLogApp {
         current_layer.add_line(border);
 
         // Draw each channel
-        for selected in &self.selected_channels {
+        for selected in self.get_selected_channels() {
             let color_rgb = self.get_channel_color(selected.color_index);
             let line_color = Color::Rgb(Rgb::new(
                 color_rgb[0] as f32 / 255.0,
@@ -306,7 +306,7 @@ impl UltraLogApp {
         let legend_y = chart_bottom - 12.0;
         let mut legend_x = chart_left;
 
-        for selected in &self.selected_channels {
+        for selected in self.get_selected_channels() {
             let color_rgb = self.get_channel_color(selected.color_index);
             let text_color = Color::Rgb(Rgb::new(
                 color_rgb[0] as f32 / 255.0,

@@ -55,6 +55,9 @@ impl UltraLogApp {
                 if response.clicked() {
                     self.active_tool = tool;
                 }
+                if response.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
 
                 ui.add_space(4.0);
             }

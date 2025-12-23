@@ -11,17 +11,17 @@ use crate::state::{ScatterPlotConfig, SelectedHeatmapPoint};
 
 /// Heat map color gradient from blue (low) to red (high)
 const HEAT_COLORS: &[[u8; 3]] = &[
-    [0, 0, 80],      // Dark blue (0.0)
-    [0, 0, 180],     // Blue
-    [0, 100, 255],   // Light blue
-    [0, 200, 255],   // Cyan
-    [0, 255, 200],   // Cyan-green
-    [0, 255, 100],   // Green
-    [100, 255, 0],   // Yellow-green
-    [200, 255, 0],   // Yellow
-    [255, 200, 0],   // Orange
-    [255, 100, 0],   // Red-orange
-    [255, 0, 0],     // Red (1.0)
+    [0, 0, 80],    // Dark blue (0.0)
+    [0, 0, 180],   // Blue
+    [0, 100, 255], // Light blue
+    [0, 200, 255], // Cyan
+    [0, 255, 200], // Cyan-green
+    [0, 255, 100], // Green
+    [100, 255, 0], // Yellow-green
+    [200, 255, 0], // Yellow
+    [255, 200, 0], // Orange
+    [255, 100, 0], // Red-orange
+    [255, 0, 0],   // Red (1.0)
 ];
 
 /// Number of bins in each dimension for the heatmap grid (higher = more detail)
@@ -40,7 +40,8 @@ const CROSSHAIR_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 255, 0); // 
 impl UltraLogApp {
     /// Render the scatter plot view with two side-by-side plots
     pub fn render_scatter_plot_view(&mut self, ui: &mut egui::Ui) {
-        if self.files.is_empty() {
+        // Check if we have an active tab with valid file
+        if self.active_tab.is_none() || self.files.is_empty() {
             ui.centered_and_justified(|ui| {
                 ui.label(
                     egui::RichText::new("Load a log file to use scatter plots")
@@ -51,13 +52,9 @@ impl UltraLogApp {
             return;
         }
 
-        // Set default file index if not set
-        if self.scatter_plot_state.left.file_index.is_none() {
-            self.scatter_plot_state.left.file_index = Some(0);
-        }
-        if self.scatter_plot_state.right.file_index.is_none() {
-            self.scatter_plot_state.right.file_index = Some(0);
-        }
+        // Render the tab bar first (same as log viewer)
+        self.render_tab_bar(ui);
+        ui.add_space(10.0);
 
         // Get available size for layout
         let available_width = ui.available_width();
@@ -80,14 +77,18 @@ impl UltraLogApp {
 
     /// Render a single scatter plot panel with controls
     fn render_scatter_plot_panel(&mut self, ui: &mut egui::Ui, is_left: bool) {
+        let Some(tab_idx) = self.active_tab else {
+            return;
+        };
+
         let config = if is_left {
-            &self.scatter_plot_state.left
+            &self.tabs[tab_idx].scatter_plot_state.left
         } else {
-            &self.scatter_plot_state.right
+            &self.tabs[tab_idx].scatter_plot_state.right
         };
 
         // Get channel names for the title
-        let file_idx = config.file_index.unwrap_or(0);
+        let file_idx = config.file_index.unwrap_or(self.tabs[tab_idx].file_index);
         let title = self.get_scatter_plot_title(config, file_idx);
 
         // Title
@@ -144,13 +145,28 @@ impl UltraLogApp {
 
     /// Render axis selector dropdowns
     fn render_axis_selectors(&mut self, ui: &mut egui::Ui, is_left: bool) {
-        let config = if is_left {
-            &mut self.scatter_plot_state.left
-        } else {
-            &mut self.scatter_plot_state.right
+        let Some(tab_idx) = self.active_tab else {
+            return;
         };
 
-        let file_idx = config.file_index.unwrap_or(0);
+        // Get values upfront to avoid borrow issues
+        let tab_file_index = self.tabs[tab_idx].file_index;
+        let (file_idx, current_x, current_y) = if is_left {
+            let config = &self.tabs[tab_idx].scatter_plot_state.left;
+            (
+                config.file_index.unwrap_or(tab_file_index),
+                config.x_channel,
+                config.y_channel,
+            )
+        } else {
+            let config = &self.tabs[tab_idx].scatter_plot_state.right;
+            (
+                config.file_index.unwrap_or(tab_file_index),
+                config.x_channel,
+                config.y_channel,
+            )
+        };
+
         if file_idx >= self.files.len() {
             return;
         }
@@ -171,24 +187,24 @@ impl UltraLogApp {
             .map(|(idx, name, _)| (*idx, name.clone()))
             .collect();
 
+        // Track which channel was selected
+        let mut new_x_channel: Option<usize> = None;
+        let mut new_y_channel: Option<usize> = None;
+
         ui.horizontal(|ui| {
             // X Axis selector
             ui.label("X Axis:");
             egui::ComboBox::from_id_salt(if is_left { "left_x" } else { "right_x" })
                 .selected_text(
-                    config
-                        .x_channel
+                    current_x
                         .and_then(|i| channel_names.get(&i).map(|n| n.as_str()))
                         .unwrap_or("Select..."),
                 )
                 .width(140.0)
                 .show_ui(ui, |ui| {
                     for (idx, name, _is_normalized) in &sorted_channels {
-                        if ui
-                            .selectable_label(config.x_channel == Some(*idx), name)
-                            .clicked()
-                        {
-                            config.x_channel = Some(*idx);
+                        if ui.selectable_label(current_x == Some(*idx), name).clicked() {
+                            new_x_channel = Some(*idx);
                         }
                     }
                 });
@@ -199,19 +215,15 @@ impl UltraLogApp {
             ui.label("Y Axis:");
             egui::ComboBox::from_id_salt(if is_left { "left_y" } else { "right_y" })
                 .selected_text(
-                    config
-                        .y_channel
+                    current_y
                         .and_then(|i| channel_names.get(&i).map(|n| n.as_str()))
                         .unwrap_or("Select..."),
                 )
                 .width(140.0)
                 .show_ui(ui, |ui| {
                     for (idx, name, _is_normalized) in &sorted_channels {
-                        if ui
-                            .selectable_label(config.y_channel == Some(*idx), name)
-                            .clicked()
-                        {
-                            config.y_channel = Some(*idx);
+                        if ui.selectable_label(current_y == Some(*idx), name).clicked() {
+                            new_y_channel = Some(*idx);
                         }
                     }
                 });
@@ -220,22 +232,39 @@ impl UltraLogApp {
 
             // Z Axis is always "Hits" (density)
             ui.label("Z Axis:");
-            ui.label(
-                egui::RichText::new("Hits")
-                    .color(egui::Color32::from_rgb(150, 150, 150)),
-            );
+            ui.label(egui::RichText::new("Hits").color(egui::Color32::from_rgb(150, 150, 150)));
         });
+
+        // Apply channel updates after UI is rendered
+        if let Some(x) = new_x_channel {
+            if is_left {
+                self.tabs[tab_idx].scatter_plot_state.left.x_channel = Some(x);
+            } else {
+                self.tabs[tab_idx].scatter_plot_state.right.x_channel = Some(x);
+            }
+        }
+        if let Some(y) = new_y_channel {
+            if is_left {
+                self.tabs[tab_idx].scatter_plot_state.left.y_channel = Some(y);
+            } else {
+                self.tabs[tab_idx].scatter_plot_state.right.y_channel = Some(y);
+            }
+        }
     }
 
     /// Render the actual heatmap chart
     fn render_scatter_plot_chart(&mut self, ui: &mut egui::Ui, is_left: bool) {
-        let config = if is_left {
-            &self.scatter_plot_state.left
-        } else {
-            &self.scatter_plot_state.right
+        let Some(tab_idx) = self.active_tab else {
+            return;
         };
 
-        let file_idx = config.file_index.unwrap_or(0);
+        let config = if is_left {
+            &self.tabs[tab_idx].scatter_plot_state.left
+        } else {
+            &self.tabs[tab_idx].scatter_plot_state.right
+        };
+
+        let file_idx = config.file_index.unwrap_or(self.tabs[tab_idx].file_index);
 
         // Check if we have valid axis selections
         let (x_idx, y_idx) = match (config.x_channel, config.y_channel) {
@@ -273,8 +302,16 @@ impl UltraLogApp {
         let y_min = y_data.iter().cloned().fold(f64::MAX, f64::min);
         let y_max = y_data.iter().cloned().fold(f64::MIN, f64::max);
 
-        let x_range = if (x_max - x_min).abs() < f64::EPSILON { 1.0 } else { x_max - x_min };
-        let y_range = if (y_max - y_min).abs() < f64::EPSILON { 1.0 } else { y_max - y_min };
+        let x_range = if (x_max - x_min).abs() < f64::EPSILON {
+            1.0
+        } else {
+            x_max - x_min
+        };
+        let y_range = if (y_max - y_min).abs() < f64::EPSILON {
+            1.0
+        } else {
+            y_max - y_min
+        };
 
         // Build 2D histogram (count hits in each bin)
         let mut histogram = vec![vec![0u32; HEATMAP_BINS]; HEATMAP_BINS];
@@ -294,12 +331,16 @@ impl UltraLogApp {
         // Allocate space for the heatmap (with click detection), reserving space for legend
         let available = ui.available_size();
         let chart_size = egui::vec2(available.x, (available.y - LEGEND_HEIGHT).max(100.0));
-        let (full_rect, response) = ui.allocate_exact_size(chart_size, egui::Sense::click_and_drag());
+        let (full_rect, response) =
+            ui.allocate_exact_size(chart_size, egui::Sense::click_and_drag());
 
         // Create inner plot rect with margins for axis labels
         let plot_rect = egui::Rect::from_min_max(
             egui::pos2(full_rect.left() + AXIS_LABEL_MARGIN_LEFT, full_rect.top()),
-            egui::pos2(full_rect.right(), full_rect.bottom() - AXIS_LABEL_MARGIN_BOTTOM),
+            egui::pos2(
+                full_rect.right(),
+                full_rect.bottom() - AXIS_LABEL_MARGIN_BOTTOM,
+            ),
         );
 
         // Fill background with black
@@ -359,7 +400,10 @@ impl UltraLogApp {
 
             // Grid line (inside plot area)
             painter.line_segment(
-                [egui::pos2(plot_rect.left(), y_pos), egui::pos2(plot_rect.right(), y_pos)],
+                [
+                    egui::pos2(plot_rect.left(), y_pos),
+                    egui::pos2(plot_rect.right(), y_pos),
+                ],
                 egui::Stroke::new(0.5, egui::Color32::from_rgb(60, 60, 60)),
             );
         }
@@ -381,16 +425,19 @@ impl UltraLogApp {
 
             // Grid line (inside plot area)
             painter.line_segment(
-                [egui::pos2(x_pos, plot_rect.top()), egui::pos2(x_pos, plot_rect.bottom())],
+                [
+                    egui::pos2(x_pos, plot_rect.top()),
+                    egui::pos2(x_pos, plot_rect.bottom()),
+                ],
                 egui::Stroke::new(0.5, egui::Color32::from_rgb(60, 60, 60)),
             );
         }
 
         // Get mutable config for click handling
         let config = if is_left {
-            &mut self.scatter_plot_state.left
+            &mut self.tabs[tab_idx].scatter_plot_state.left
         } else {
-            &mut self.scatter_plot_state.right
+            &mut self.tabs[tab_idx].scatter_plot_state.right
         };
 
         // Draw selected point crosshairs (persistent)
@@ -405,11 +452,17 @@ impl UltraLogApp {
                 // Draw persistent crosshairs (cyan for selected)
                 let selected_color = egui::Color32::from_rgb(0, 255, 255);
                 painter.line_segment(
-                    [egui::pos2(sel_x, plot_rect.top()), egui::pos2(sel_x, plot_rect.bottom())],
+                    [
+                        egui::pos2(sel_x, plot_rect.top()),
+                        egui::pos2(sel_x, plot_rect.bottom()),
+                    ],
                     egui::Stroke::new(1.5, selected_color),
                 );
                 painter.line_segment(
-                    [egui::pos2(plot_rect.left(), sel_y), egui::pos2(plot_rect.right(), sel_y)],
+                    [
+                        egui::pos2(plot_rect.left(), sel_y),
+                        egui::pos2(plot_rect.right(), sel_y),
+                    ],
                     egui::Stroke::new(1.5, selected_color),
                 );
 
@@ -435,11 +488,17 @@ impl UltraLogApp {
 
                     // Draw hover crosshairs (yellow, thinner than selected)
                     painter.line_segment(
-                        [egui::pos2(pos.x, plot_rect.top()), egui::pos2(pos.x, plot_rect.bottom())],
+                        [
+                            egui::pos2(pos.x, plot_rect.top()),
+                            egui::pos2(pos.x, plot_rect.bottom()),
+                        ],
                         egui::Stroke::new(1.0, CROSSHAIR_COLOR),
                     );
                     painter.line_segment(
-                        [egui::pos2(plot_rect.left(), pos.y), egui::pos2(plot_rect.right(), pos.y)],
+                        [
+                            egui::pos2(plot_rect.left(), pos.y),
+                            egui::pos2(plot_rect.right(), pos.y),
+                        ],
                         egui::Stroke::new(1.0, CROSSHAIR_COLOR),
                     );
 
@@ -505,15 +564,19 @@ impl UltraLogApp {
         _y_min: f64,
         _y_max: f64,
     ) {
+        let Some(tab_idx) = self.active_tab else {
+            return;
+        };
+
         // First, gather the data we need (immutable borrow)
         let config = if is_left {
-            &self.scatter_plot_state.left
+            &self.tabs[tab_idx].scatter_plot_state.left
         } else {
-            &self.scatter_plot_state.right
+            &self.tabs[tab_idx].scatter_plot_state.right
         };
 
         let selected_point = config.selected_point.clone();
-        let file_idx = config.file_index.unwrap_or(0);
+        let file_idx = config.file_index.unwrap_or(self.tabs[tab_idx].file_index);
         let x_channel = config.x_channel;
         let y_channel = config.y_channel;
 
@@ -524,7 +587,10 @@ impl UltraLogApp {
                 .and_then(|i| file.log.channels.get(i))
                 .map(|c| {
                     if self.field_normalization {
-                        normalize_channel_name_with_custom(&c.name(), Some(&self.custom_normalizations))
+                        normalize_channel_name_with_custom(
+                            &c.name(),
+                            Some(&self.custom_normalizations),
+                        )
                     } else {
                         c.name()
                     }
@@ -534,7 +600,10 @@ impl UltraLogApp {
                 .and_then(|i| file.log.channels.get(i))
                 .map(|c| {
                     if self.field_normalization {
-                        normalize_channel_name_with_custom(&c.name(), Some(&self.custom_normalizations))
+                        normalize_channel_name_with_custom(
+                            &c.name(),
+                            Some(&self.custom_normalizations),
+                        )
                     } else {
                         c.name()
                     }
@@ -606,10 +675,8 @@ impl UltraLogApp {
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             // Cyan indicator dot
-                            let (dot_rect, _) = ui.allocate_exact_size(
-                                egui::vec2(10.0, 10.0),
-                                egui::Sense::hover(),
-                            );
+                            let (dot_rect, _) = ui
+                                .allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
                             ui.painter().circle_filled(
                                 dot_rect.center(),
                                 5.0,
@@ -621,8 +688,10 @@ impl UltraLogApp {
                             ui.label(
                                 egui::RichText::new(format!(
                                     "{}: {:.1}  |  {}: {:.1}  |  Hits: {}",
-                                    x_name, selected.x_value,
-                                    y_name, selected.y_value,
+                                    x_name,
+                                    selected.x_value,
+                                    y_name,
+                                    selected.y_value,
                                     selected.hits
                                 ))
                                 .size(11.0)
@@ -643,9 +712,9 @@ impl UltraLogApp {
         // Clear selection if button was clicked
         if should_clear {
             if is_left {
-                self.scatter_plot_state.left.selected_point = None;
+                self.tabs[tab_idx].scatter_plot_state.left.selected_point = None;
             } else {
-                self.scatter_plot_state.right.selected_point = None;
+                self.tabs[tab_idx].scatter_plot_state.right.selected_point = None;
             }
         }
     }

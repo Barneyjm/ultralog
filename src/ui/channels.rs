@@ -12,36 +12,56 @@ impl UltraLogApp {
         ui.heading("Channels");
         ui.separator();
 
-        if let Some(file_index) = self.selected_file {
-            let file = &self.files[file_index];
+        // Get active tab info
+        let tab_info = self.active_tab.and_then(|tab_idx| {
+            let tab = &self.tabs[tab_idx];
+            if tab.file_index < self.files.len() {
+                Some((
+                    tab.file_index,
+                    tab.channel_search.clone(),
+                    tab.selected_channels.len(),
+                ))
+            } else {
+                None
+            }
+        });
 
-            // Search box
+        if let Some((file_index, current_search, selected_count)) = tab_info {
+            let channel_count = self.files[file_index].log.channels.len();
+
+            // Search box - use a temporary string that we'll update
+            let mut search_text = current_search;
+            let mut search_changed = false;
             ui.horizontal(|ui| {
                 ui.label("Search:");
-                ui.add(
-                    egui::TextEdit::singleline(&mut self.channel_search)
-                        .desired_width(f32::INFINITY),
-                );
+                let response = ui
+                    .add(egui::TextEdit::singleline(&mut search_text).desired_width(f32::INFINITY));
+                search_changed = response.changed();
             });
+
+            // Defer the set_channel_search call to avoid borrow issues
+            if search_changed {
+                self.set_channel_search(search_text.clone());
+            }
 
             ui.add_space(5.0);
 
             // Channel count
             ui.label(format!(
                 "Selected: {} / {} | Total: {}",
-                self.selected_channels.len(),
-                MAX_CHANNELS,
-                file.log.channels.len()
+                selected_count, MAX_CHANNELS, channel_count
             ));
 
             ui.separator();
 
             // Channel list - use all remaining vertical space
-            let search_lower = self.channel_search.to_lowercase();
+            let search_lower = search_text.to_lowercase();
             let mut channel_to_add: Option<(usize, usize)> = None;
             let mut channel_to_remove: Option<usize> = None;
 
             // Sort channels: normalized fields first, then alphabetically
+            // Collect channel names upfront to avoid borrow issues
+            let file = &self.files[file_index];
             let sorted_channels = sort_channels_by_priority(
                 file.log.channels.len(),
                 |idx| file.log.channels[idx].name(),
@@ -49,13 +69,21 @@ impl UltraLogApp {
                 Some(&self.custom_normalizations),
             );
 
+            // Get original names for all channels (needed for search)
+            let channel_names: Vec<String> = (0..file.log.channels.len())
+                .map(|idx| file.log.channels[idx].name())
+                .collect();
+
+            // Get selected channels for comparison
+            let selected_channels = self.get_selected_channels().to_vec();
+
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
 
                     for (channel_index, display_name, _is_normalized) in &sorted_channels {
-                        let original_name = file.log.channels[*channel_index].name();
+                        let original_name = &channel_names[*channel_index];
 
                         // Filter by search (search both original and normalized names)
                         if !search_lower.is_empty()
@@ -66,7 +94,7 @@ impl UltraLogApp {
                         }
 
                         // Check if already selected and get its index in selected_channels
-                        let selected_idx = self.selected_channels.iter().position(|c| {
+                        let selected_idx = selected_channels.iter().position(|c| {
                             c.file_index == file_index && c.channel_index == *channel_index
                         });
                         let is_selected = selected_idx.is_some();
@@ -88,6 +116,9 @@ impl UltraLogApp {
                                 // Not selected - add it
                                 channel_to_add = Some((file_index, *channel_index));
                             }
+                        }
+                        if response.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
                     }
                 });
@@ -121,9 +152,12 @@ impl UltraLogApp {
         let use_normalization = self.field_normalization;
         let custom_mappings = &self.custom_normalizations;
 
+        // Get selected channels from the active tab
+        let selected_channels = self.get_selected_channels().to_vec();
+
         egui::ScrollArea::horizontal().show(ui, |ui| {
             ui.horizontal(|ui| {
-                for (i, selected) in self.selected_channels.iter().enumerate() {
+                for (i, selected) in selected_channels.iter().enumerate() {
                     let color = self.get_channel_color(selected.color_index);
                     let color32 = egui::Color32::from_rgb(color[0], color[1], color[2]);
 
@@ -146,8 +180,12 @@ impl UltraLogApp {
                                     ui.label(
                                         egui::RichText::new(&display_name).strong().color(color32),
                                     );
-                                    if ui.small_button("x").clicked() {
+                                    let close_btn = ui.small_button("x");
+                                    if close_btn.clicked() {
                                         channel_to_remove = Some(i);
+                                    }
+                                    if close_btn.hovered() {
+                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                                     }
                                 });
 
@@ -193,7 +231,7 @@ impl UltraLogApp {
             self.remove_channel(index);
         }
 
-        if self.selected_channels.is_empty() {
+        if selected_channels.is_empty() {
             ui.label(
                 egui::RichText::new("Click channels to add them to the chart")
                     .italics()

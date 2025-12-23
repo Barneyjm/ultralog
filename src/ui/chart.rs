@@ -10,7 +10,10 @@ use crate::state::{CacheKey, CHART_COLORS, COLORBLIND_COLORS, MAX_CHART_POINTS};
 impl UltraLogApp {
     /// Render the main chart with cached downsampled data
     pub fn render_chart(&mut self, ui: &mut egui::Ui) {
-        if self.selected_channels.is_empty() {
+        // Get selected channels from active tab
+        let selected_channels = self.get_selected_channels().to_vec();
+
+        if selected_channels.is_empty() {
             ui.centered_and_justified(|ui| {
                 ui.label(
                     egui::RichText::new("Select channels to display chart")
@@ -22,7 +25,7 @@ impl UltraLogApp {
         }
 
         // Pre-compute and cache downsampled + normalized data for all selected channels
-        for selected in &self.selected_channels {
+        for selected in &selected_channels {
             if selected.file_index >= self.files.len() {
                 continue;
             }
@@ -49,8 +52,7 @@ impl UltraLogApp {
         // Pre-compute legend names with current values at cursor position
         let use_normalization = self.field_normalization;
         let custom_mappings = &self.custom_normalizations;
-        let legend_names: Vec<String> = self
-            .selected_channels
+        let legend_names: Vec<String> = selected_channels
             .iter()
             .map(|selected| {
                 let original_name = selected.channel.name();
@@ -59,7 +61,7 @@ impl UltraLogApp {
                 } else {
                     original_name
                 };
-                if let Some(record) = self.cursor_record {
+                if let Some(record) = self.get_cursor_record() {
                     if let Some(value) = self.get_value_at_record(
                         selected.file_index,
                         selected.channel_index,
@@ -85,13 +87,13 @@ impl UltraLogApp {
         // Prepare data for the plot closure (can't borrow self mutably inside)
         let cache = &self.downsample_cache;
         let files = &self.files;
-        let selected_channels = &self.selected_channels;
-        let cursor_time = self.cursor_time;
+        // selected_channels already defined at top of function from get_selected_channels()
+        let cursor_time = self.get_cursor_time();
         let cursor_tracking = self.cursor_tracking;
         let view_window = self.view_window_seconds;
-        let time_range = self.time_range;
+        let time_range = self.get_time_range();
         let color_blind_mode = self.color_blind_mode;
-        let chart_interacted = self.chart_interacted;
+        let chart_interacted = self.get_chart_interacted();
         let initial_view_seconds = self.initial_view_seconds;
 
         // Fixed Y bounds for normalized data (0-1 with small padding)
@@ -207,7 +209,7 @@ impl UltraLogApp {
             || ui.input(|i| i.zoom_delta() != 1.0)
             || ui.input(|i| i.smooth_scroll_delta.x != 0.0)
         {
-            self.chart_interacted = true;
+            self.set_chart_interacted(true);
         }
 
         // Handle click on chart to set cursor position
@@ -215,14 +217,15 @@ impl UltraLogApp {
             if let Some(pos) = response.inner {
                 let clicked_time = pos.x;
                 // Clamp to time range
-                if let Some((min, max)) = self.time_range {
+                if let Some((min, max)) = self.get_time_range() {
                     // Stop playback when user clicks on chart
                     self.is_playing = false;
                     self.last_frame_time = None;
 
                     let clamped_time = clicked_time.clamp(min, max);
-                    self.cursor_time = Some(clamped_time);
-                    self.cursor_record = self.find_record_at_time(clamped_time);
+                    self.set_cursor_time(Some(clamped_time));
+                    let record = self.find_record_at_time(clamped_time);
+                    self.set_cursor_record(record);
                     // Force repaint to update legend values immediately
                     ui.ctx().request_repaint();
                 }
@@ -235,7 +238,9 @@ impl UltraLogApp {
 
     /// Render the min/max legend overlay in the top-left corner of the chart
     pub fn render_minmax_legend(&self, ui: &mut egui::Ui, chart_rect: egui::Rect) {
-        if self.selected_channels.is_empty() {
+        let selected_channels = self.get_selected_channels();
+
+        if selected_channels.is_empty() {
             return;
         }
 
@@ -256,7 +261,7 @@ impl UltraLogApp {
                         ui.label(egui::RichText::new("Min / Max").color(egui::Color32::GRAY));
                         ui.add_space(4.0);
 
-                        for selected in &self.selected_channels {
+                        for selected in selected_channels {
                             let color = self.get_channel_color(selected.color_index);
                             let color32 = egui::Color32::from_rgb(color[0], color[1], color[2]);
 

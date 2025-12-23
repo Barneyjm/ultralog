@@ -26,13 +26,31 @@ impl UltraLogApp {
         // File list (if any files loaded)
         if !self.files.is_empty() {
             let mut file_to_remove: Option<usize> = None;
-            for (i, file) in self.files.iter().enumerate() {
-                let is_selected = self.selected_file == Some(i);
+            let mut file_to_switch: Option<usize> = None;
 
+            // Collect file info upfront to avoid borrow issues
+            let file_info: Vec<(String, bool, String, usize, usize)> = self
+                .files
+                .iter()
+                .enumerate()
+                .map(|(i, file)| {
+                    (
+                        file.name.clone(),
+                        self.selected_file == Some(i),
+                        file.ecu_type.name().to_string(),
+                        file.log.channels.len(),
+                        file.log.data.len(),
+                    )
+                })
+                .collect();
+
+            for (i, (file_name, is_selected, ecu_name, channel_count, data_count)) in
+                file_info.iter().enumerate()
+            {
                 ui.horizontal(|ui| {
-                    let response = ui.selectable_label(is_selected, &file.name);
+                    let response = ui.selectable_label(*is_selected, file_name);
                     if response.clicked() {
-                        self.selected_file = Some(i);
+                        file_to_switch = Some(i);
                     }
 
                     // Delete button
@@ -46,14 +64,17 @@ impl UltraLogApp {
                     ui.label(
                         egui::RichText::new(format!(
                             "{} | {} channels | {} points",
-                            file.ecu_type.name(),
-                            file.log.channels.len(),
-                            file.log.data.len()
+                            ecu_name, channel_count, data_count
                         ))
                         .size(12.0)
                         .color(egui::Color32::GRAY),
                     );
                 });
+            }
+
+            // Handle deferred file switching
+            if let Some(index) = file_to_switch {
+                self.switch_to_file_tab(index);
             }
 
             if let Some(index) = file_to_remove {
@@ -173,7 +194,7 @@ impl UltraLogApp {
 
             // Only show options when we have data to view and are in Log Viewer mode
             if !self.files.is_empty()
-                && !self.selected_channels.is_empty()
+                && !self.get_selected_channels().is_empty()
                 && self.active_tool == ActiveTool::LogViewer
             {
                 egui::Frame::none()

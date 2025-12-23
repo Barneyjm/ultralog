@@ -12,8 +12,8 @@ use std::thread;
 
 use crate::parsers::{EcuMaster, EcuType, Haltech, Parseable, Speeduino};
 use crate::state::{
-    ActiveTool, CacheKey, LoadResult, LoadedFile, LoadingState, ScatterPlotState,
-    SelectedChannel, CHART_COLORS, COLORBLIND_COLORS, MAX_CHANNELS,
+    ActiveTool, CacheKey, LoadResult, LoadedFile, LoadingState, ScatterPlotConfig,
+    ScatterPlotState, SelectedChannel, Tab, CHART_COLORS, COLORBLIND_COLORS, MAX_CHANNELS,
 };
 use crate::units::UnitPreferences;
 
@@ -25,12 +25,8 @@ use crate::units::UnitPreferences;
 pub struct UltraLogApp {
     /// List of loaded log files
     pub(crate) files: Vec<LoadedFile>,
-    /// Currently selected file index
+    /// Currently selected file index (matches active tab's file)
     pub(crate) selected_file: Option<usize>,
-    /// Channels selected for visualization
-    pub(crate) selected_channels: Vec<SelectedChannel>,
-    /// Channel search/filter text
-    pub(crate) channel_search: String,
     /// Toast messages for user feedback
     pub(crate) toast_message: Option<(String, std::time::Instant)>,
     /// Track dropped files to prevent duplicates
@@ -65,8 +61,6 @@ pub struct UltraLogApp {
     /// When true, normalize field names to standard names
     pub(crate) field_normalization: bool,
     // === Chart View State ===
-    /// Whether user has interacted with chart zoom/pan (false = use initial zoomed view)
-    pub(crate) chart_interacted: bool,
     /// Initial view window in seconds (shown before user interacts with chart)
     pub(crate) initial_view_seconds: f64,
     // === Unit Preferences ===
@@ -84,8 +78,11 @@ pub struct UltraLogApp {
     // === Tool/View Selection ===
     /// Currently active tool/view
     pub(crate) active_tool: ActiveTool,
-    /// State for the scatter plot view
-    pub(crate) scatter_plot_state: ScatterPlotState,
+    // === Tab Management ===
+    /// Open tabs (one per log file being viewed)
+    pub(crate) tabs: Vec<Tab>,
+    /// Index of the currently active tab
+    pub(crate) active_tab: Option<usize>,
 }
 
 impl Default for UltraLogApp {
@@ -93,8 +90,6 @@ impl Default for UltraLogApp {
         Self {
             files: Vec::new(),
             selected_file: None,
-            selected_channels: Vec::new(),
-            channel_search: String::new(),
             toast_message: None,
             last_drop_time: None,
             load_receiver: None,
@@ -110,7 +105,6 @@ impl Default for UltraLogApp {
             playback_speed: 1.0,
             color_blind_mode: false,
             field_normalization: true, // Enabled by default for better readability
-            chart_interacted: false,
             initial_view_seconds: 60.0, // Start with 60 second view
             unit_preferences: UnitPreferences::default(),
             custom_normalizations: HashMap::new(),
@@ -118,7 +112,8 @@ impl Default for UltraLogApp {
             norm_editor_source: String::new(),
             norm_editor_target: String::new(),
             active_tool: ActiveTool::default(),
-            scatter_plot_state: ScatterPlotState::default(),
+            tabs: Vec::new(),
+            active_tab: None,
         }
     }
 }
@@ -306,11 +301,33 @@ impl UltraLogApp {
             if let Ok(result) = receiver.try_recv() {
                 match result {
                     LoadResult::Success(file) => {
+                        let file_index = self.files.len();
+                        let file_name = file.name.clone();
+
+                        // Compute time range for this file
+                        let times = file.log.get_times_as_f64();
+                        let file_time_range =
+                            if let (Some(&first), Some(&last)) = (times.first(), times.last()) {
+                                Some((first, last))
+                            } else {
+                                None
+                            };
+
                         self.files.push(*file);
-                        self.selected_file = Some(self.files.len() - 1);
+                        self.selected_file = Some(file_index);
                         self.update_time_range();
-                        // Reset chart interaction so new file shows initial zoomed view
-                        self.chart_interacted = false;
+
+                        // Create a new tab for this file with its time range
+                        let mut tab = Tab::new(file_index, file_name);
+                        tab.time_range = file_time_range;
+                        // Initialize cursor to start of file
+                        if let Some((min_time, _)) = file_time_range {
+                            tab.cursor_time = Some(min_time);
+                            tab.cursor_record = Some(0);
+                        }
+                        self.tabs.push(tab);
+                        self.active_tab = Some(self.tabs.len() - 1);
+
                         self.show_toast("File loaded successfully");
                     }
                     LoadResult::Error(e) => {
@@ -435,8 +452,10 @@ impl UltraLogApp {
     /// Remove a loaded file
     pub fn remove_file(&mut self, index: usize) {
         if index < self.files.len() {
-            // Remove any selected channels from this file
-            self.selected_channels.retain(|c| c.file_index != index);
+            // Find and close the tab for this file
+            if let Some(tab_idx) = self.tabs.iter().position(|t| t.file_index == index) {
+                self.close_tab(tab_idx);
+            }
 
             // Clear cache entries for this file and update indices
             let mut new_cache = HashMap::new();
@@ -459,10 +478,16 @@ impl UltraLogApp {
             }
             self.downsample_cache = new_cache;
 
-            // Update file indices for remaining channels
-            for channel in &mut self.selected_channels {
-                if channel.file_index > index {
-                    channel.file_index -= 1;
+            // Update file indices for remaining tabs and their channels
+            for tab in &mut self.tabs {
+                if tab.file_index > index {
+                    tab.file_index -= 1;
+                    // Update file indices in selected channels
+                    for channel in &mut tab.selected_channels {
+                        if channel.file_index > index {
+                            channel.file_index -= 1;
+                        }
+                    }
                 }
             }
 
@@ -482,15 +507,28 @@ impl UltraLogApp {
         }
     }
 
-    /// Add a channel to the selection
+    /// Add a channel to the active tab's selection
     pub fn add_channel(&mut self, file_index: usize, channel_index: usize) {
-        if self.selected_channels.len() >= MAX_CHANNELS {
+        let Some(tab_idx) = self.active_tab else {
+            self.show_toast("No active tab");
+            return;
+        };
+
+        let tab = &self.tabs[tab_idx];
+
+        // Only allow adding channels from the tab's file
+        if file_index != tab.file_index {
+            self.show_toast("Channel must be from the active tab's file");
+            return;
+        }
+
+        if tab.selected_channels.len() >= MAX_CHANNELS {
             self.show_toast("Maximum 10 channels reached");
             return;
         }
 
         // Check for duplicate
-        if self
+        if tab
             .selected_channels
             .iter()
             .any(|c| c.file_index == file_index && c.channel_index == channel_index)
@@ -503,7 +541,7 @@ impl UltraLogApp {
         let channel = file.log.channels[channel_index].clone();
 
         // Find the first unused color index
-        let used_colors: std::collections::HashSet<usize> = self
+        let used_colors: std::collections::HashSet<usize> = tab
             .selected_channels
             .iter()
             .map(|c| c.color_index)
@@ -513,16 +551,7 @@ impl UltraLogApp {
             .find(|i| !used_colors.contains(i))
             .unwrap_or(0);
 
-        eprintln!(
-            "DEBUG: Adding channel - file={} channel={} name={} (total selected: {} -> {})",
-            file_index,
-            channel_index,
-            channel.name(),
-            self.selected_channels.len(),
-            self.selected_channels.len() + 1
-        );
-
-        self.selected_channels.push(SelectedChannel {
+        self.tabs[tab_idx].selected_channels.push(SelectedChannel {
             file_index,
             channel_index,
             channel,
@@ -530,11 +559,167 @@ impl UltraLogApp {
         });
     }
 
-    /// Remove a channel from the selection
+    /// Remove a channel from the active tab's selection
     pub fn remove_channel(&mut self, index: usize) {
-        if index < self.selected_channels.len() {
-            self.selected_channels.remove(index);
+        let Some(tab_idx) = self.active_tab else {
+            return;
+        };
+
+        if index < self.tabs[tab_idx].selected_channels.len() {
+            self.tabs[tab_idx].selected_channels.remove(index);
         }
+    }
+
+    /// Get the selected channels for the active tab
+    pub fn get_selected_channels(&self) -> &[SelectedChannel] {
+        if let Some(tab_idx) = self.active_tab {
+            &self.tabs[tab_idx].selected_channels
+        } else {
+            &[]
+        }
+    }
+
+    /// Get the channel search string for the active tab
+    pub fn get_channel_search(&self) -> &str {
+        if let Some(tab_idx) = self.active_tab {
+            &self.tabs[tab_idx].channel_search
+        } else {
+            ""
+        }
+    }
+
+    /// Set the channel search string for the active tab
+    pub fn set_channel_search(&mut self, search: String) {
+        if let Some(tab_idx) = self.active_tab {
+            self.tabs[tab_idx].channel_search = search;
+        }
+    }
+
+    /// Switch to a tab for the given file, creating one if it doesn't exist
+    pub fn switch_to_file_tab(&mut self, file_index: usize) {
+        // Check if a tab already exists for this file
+        if let Some(tab_idx) = self.tabs.iter().position(|t| t.file_index == file_index) {
+            self.active_tab = Some(tab_idx);
+            self.selected_file = Some(file_index);
+        } else {
+            // Create a new tab for this file
+            let file_name = self.files[file_index].name.clone();
+            let tab = Tab::new(file_index, file_name);
+            self.tabs.push(tab);
+            self.active_tab = Some(self.tabs.len() - 1);
+            self.selected_file = Some(file_index);
+        }
+    }
+
+    /// Close a tab by index
+    pub fn close_tab(&mut self, tab_index: usize) {
+        if tab_index >= self.tabs.len() {
+            return;
+        }
+
+        self.tabs.remove(tab_index);
+
+        // Adjust active_tab if needed
+        if self.tabs.is_empty() {
+            self.active_tab = None;
+            self.selected_file = None;
+        } else if let Some(active) = self.active_tab {
+            if active >= self.tabs.len() {
+                self.active_tab = Some(self.tabs.len() - 1);
+            } else if active > tab_index {
+                self.active_tab = Some(active - 1);
+            }
+            // Update selected_file to match the new active tab
+            if let Some(tab_idx) = self.active_tab {
+                self.selected_file = Some(self.tabs[tab_idx].file_index);
+            }
+        }
+    }
+
+    /// Get the cursor time for the active tab
+    pub fn get_cursor_time(&self) -> Option<f64> {
+        self.active_tab.and_then(|idx| self.tabs[idx].cursor_time)
+    }
+
+    /// Set the cursor time for the active tab
+    pub fn set_cursor_time(&mut self, time: Option<f64>) {
+        if let Some(tab_idx) = self.active_tab {
+            self.tabs[tab_idx].cursor_time = time;
+        }
+    }
+
+    /// Get the cursor record for the active tab
+    pub fn get_cursor_record(&self) -> Option<usize> {
+        self.active_tab.and_then(|idx| self.tabs[idx].cursor_record)
+    }
+
+    /// Set the cursor record for the active tab
+    pub fn set_cursor_record(&mut self, record: Option<usize>) {
+        if let Some(tab_idx) = self.active_tab {
+            self.tabs[tab_idx].cursor_record = record;
+        }
+    }
+
+    /// Get the time range for the active tab
+    pub fn get_time_range(&self) -> Option<(f64, f64)> {
+        self.active_tab.and_then(|idx| self.tabs[idx].time_range)
+    }
+
+    /// Set the time range for the active tab
+    pub fn set_time_range(&mut self, range: Option<(f64, f64)>) {
+        if let Some(tab_idx) = self.active_tab {
+            self.tabs[tab_idx].time_range = range;
+        }
+    }
+
+    /// Get whether the chart has been interacted with for the active tab
+    pub fn get_chart_interacted(&self) -> bool {
+        self.active_tab
+            .map(|idx| self.tabs[idx].chart_interacted)
+            .unwrap_or(false)
+    }
+
+    /// Set the chart interacted state for the active tab
+    pub fn set_chart_interacted(&mut self, interacted: bool) {
+        if let Some(tab_idx) = self.active_tab {
+            self.tabs[tab_idx].chart_interacted = interacted;
+        }
+    }
+
+    /// Get the scatter plot state for the active tab
+    pub fn get_scatter_plot_state(&self) -> Option<&ScatterPlotState> {
+        self.active_tab
+            .map(|idx| &self.tabs[idx].scatter_plot_state)
+    }
+
+    /// Get mutable scatter plot state for the active tab
+    pub fn get_scatter_plot_state_mut(&mut self) -> Option<&mut ScatterPlotState> {
+        self.active_tab
+            .map(|idx| &mut self.tabs[idx].scatter_plot_state)
+    }
+
+    /// Get the left scatter plot config for the active tab
+    pub fn get_scatter_left(&self) -> Option<&ScatterPlotConfig> {
+        self.active_tab
+            .map(|idx| &self.tabs[idx].scatter_plot_state.left)
+    }
+
+    /// Get mutable left scatter plot config for the active tab
+    pub fn get_scatter_left_mut(&mut self) -> Option<&mut ScatterPlotConfig> {
+        self.active_tab
+            .map(|idx| &mut self.tabs[idx].scatter_plot_state.left)
+    }
+
+    /// Get the right scatter plot config for the active tab
+    pub fn get_scatter_right(&self) -> Option<&ScatterPlotConfig> {
+        self.active_tab
+            .map(|idx| &self.tabs[idx].scatter_plot_state.right)
+    }
+
+    /// Get mutable right scatter plot config for the active tab
+    pub fn get_scatter_right_mut(&mut self) -> Option<&mut ScatterPlotConfig> {
+        self.active_tab
+            .map(|idx| &mut self.tabs[idx].scatter_plot_state.right)
     }
 
     // ========================================================================
@@ -589,7 +774,7 @@ impl UltraLogApp {
     /// Handle keyboard shortcuts
     fn handle_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
         // Only handle shortcuts when we have data loaded
-        if self.files.is_empty() || self.selected_channels.is_empty() {
+        if self.files.is_empty() || self.get_selected_channels().is_empty() {
             return;
         }
 
@@ -606,10 +791,11 @@ impl UltraLogApp {
                     // Reset frame time when starting playback
                     self.last_frame_time = Some(std::time::Instant::now());
                     // Initialize cursor if not set
-                    if self.cursor_time.is_none() {
-                        if let Some((min, _)) = self.time_range {
-                            self.cursor_time = Some(min);
-                            self.cursor_record = self.find_record_at_time(min);
+                    if self.get_cursor_time().is_none() {
+                        if let Some((min, _)) = self.get_time_range() {
+                            self.set_cursor_time(Some(min));
+                            let record = self.find_record_at_time(min);
+                            self.set_cursor_record(record);
                         }
                     }
                 }
@@ -707,7 +893,7 @@ impl eframe::App for UltraLogApp {
                 });
 
             // Bottom panel for timeline scrubber (only in Log Viewer mode)
-            if self.time_range.is_some() && !self.selected_channels.is_empty() {
+            if self.get_time_range().is_some() && !self.get_selected_channels().is_empty() {
                 egui::TopBottomPanel::bottom("timeline_panel")
                     .resizable(false)
                     .min_height(60.0)
@@ -725,7 +911,10 @@ impl eframe::App for UltraLogApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.active_tool {
                 ActiveTool::LogViewer => {
-                    // Selected channels at top
+                    // Tab bar at top (Chrome-style tabs for log files)
+                    self.render_tab_bar(ui);
+
+                    // Selected channels below tabs
                     ui.add_space(10.0);
                     self.render_selected_channels(ui);
 

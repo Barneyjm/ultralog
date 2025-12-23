@@ -52,7 +52,8 @@ impl UltraLogApp {
                 ui.separator();
 
                 // Export submenu
-                let has_chart_data = !self.files.is_empty() && !self.selected_channels.is_empty();
+                let has_chart_data =
+                    !self.files.is_empty() && !self.get_selected_channels().is_empty();
                 ui.add_enabled_ui(has_chart_data, |ui| {
                     ui.menu_button("📤  Export", |ui| {
                         // Increase font size for submenu items
@@ -130,7 +131,7 @@ impl UltraLogApp {
                     .insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
 
                 // Temperature submenu
-                ui.menu_button("♨️  Temperature", |ui| {
+                ui.menu_button("🌡  Temperature", |ui| {
                     // Increase font size for submenu items
                     ui.style_mut()
                         .text_styles
