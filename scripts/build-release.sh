@@ -115,13 +115,45 @@ clean() {
     print_success "Cleaned"
 }
 
+# Convert PNG to ICNS
+create_icns_from_png() {
+    local PNG_PATH=$1
+    local ICNS_PATH=$2
+
+    local ICONSET_DIR=$(mktemp -d)/AppIcon.iconset
+    mkdir -p "$ICONSET_DIR"
+
+    # Generate all required sizes
+    sips -z 16 16     "$PNG_PATH" --out "$ICONSET_DIR/icon_16x16.png" >/dev/null 2>&1
+    sips -z 32 32     "$PNG_PATH" --out "$ICONSET_DIR/icon_16x16@2x.png" >/dev/null 2>&1
+    sips -z 32 32     "$PNG_PATH" --out "$ICONSET_DIR/icon_32x32.png" >/dev/null 2>&1
+    sips -z 64 64     "$PNG_PATH" --out "$ICONSET_DIR/icon_32x32@2x.png" >/dev/null 2>&1
+    sips -z 128 128   "$PNG_PATH" --out "$ICONSET_DIR/icon_128x128.png" >/dev/null 2>&1
+    sips -z 256 256   "$PNG_PATH" --out "$ICONSET_DIR/icon_128x128@2x.png" >/dev/null 2>&1
+    sips -z 256 256   "$PNG_PATH" --out "$ICONSET_DIR/icon_256x256.png" >/dev/null 2>&1
+    sips -z 512 512   "$PNG_PATH" --out "$ICONSET_DIR/icon_256x256@2x.png" >/dev/null 2>&1
+    sips -z 512 512   "$PNG_PATH" --out "$ICONSET_DIR/icon_512x512.png" >/dev/null 2>&1
+    sips -z 1024 1024 "$PNG_PATH" --out "$ICONSET_DIR/icon_512x512@2x.png" >/dev/null 2>&1
+
+    # Convert to icns
+    iconutil -c icns "$ICONSET_DIR" -o "$ICNS_PATH"
+
+    # Cleanup
+    rm -rf "$(dirname "$ICONSET_DIR")"
+}
+
 # Create macOS .app bundle
 create_app_bundle() {
     local ARCH=$1
     local BINARY_PATH=$2
-    local APP_DIR="$OUTPUT_DIR/$APP_NAME-$ARCH.app"
+    local BUILD_DIR="$OUTPUT_DIR/build-$ARCH"
+    local APP_DIR="$BUILD_DIR/$APP_NAME.app"
 
     echo "Creating app bundle for $ARCH..."
+
+    # Create build directory for this arch
+    rm -rf "$BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
 
     # Create bundle structure
     mkdir -p "$APP_DIR/Contents/MacOS"
@@ -196,38 +228,13 @@ EOF
     print_success "Created: $APP_DIR"
 }
 
-# Convert PNG to ICNS
-create_icns_from_png() {
-    local PNG_PATH=$1
-    local ICNS_PATH=$2
-
-    local ICONSET_DIR=$(mktemp -d)/AppIcon.iconset
-    mkdir -p "$ICONSET_DIR"
-
-    # Generate all required sizes
-    sips -z 16 16     "$PNG_PATH" --out "$ICONSET_DIR/icon_16x16.png" >/dev/null 2>&1
-    sips -z 32 32     "$PNG_PATH" --out "$ICONSET_DIR/icon_16x16@2x.png" >/dev/null 2>&1
-    sips -z 32 32     "$PNG_PATH" --out "$ICONSET_DIR/icon_32x32.png" >/dev/null 2>&1
-    sips -z 64 64     "$PNG_PATH" --out "$ICONSET_DIR/icon_32x32@2x.png" >/dev/null 2>&1
-    sips -z 128 128   "$PNG_PATH" --out "$ICONSET_DIR/icon_128x128.png" >/dev/null 2>&1
-    sips -z 256 256   "$PNG_PATH" --out "$ICONSET_DIR/icon_128x128@2x.png" >/dev/null 2>&1
-    sips -z 256 256   "$PNG_PATH" --out "$ICONSET_DIR/icon_256x256.png" >/dev/null 2>&1
-    sips -z 512 512   "$PNG_PATH" --out "$ICONSET_DIR/icon_256x256@2x.png" >/dev/null 2>&1
-    sips -z 512 512   "$PNG_PATH" --out "$ICONSET_DIR/icon_512x512.png" >/dev/null 2>&1
-    sips -z 1024 1024 "$PNG_PATH" --out "$ICONSET_DIR/icon_512x512@2x.png" >/dev/null 2>&1
-
-    # Convert to icns
-    iconutil -c icns "$ICONSET_DIR" -o "$ICNS_PATH"
-
-    # Cleanup
-    rm -rf "$(dirname "$ICONSET_DIR")"
-}
-
 # Create DMG
 create_dmg_file() {
     local ARCH=$1
-    local APP_DIR="$OUTPUT_DIR/$APP_NAME-$ARCH.app"
+    local BUILD_DIR="$OUTPUT_DIR/build-$ARCH"
+    local APP_DIR="$BUILD_DIR/$APP_NAME.app"
     local DMG_PATH="$OUTPUT_DIR/$APP_NAME-$ARCH.dmg"
+    local ICNS_PATH="$APP_DIR/Contents/Resources/AppIcon.icns"
 
     echo "Creating DMG for $ARCH..."
 
@@ -238,12 +245,12 @@ create_dmg_file() {
         # Use create-dmg for a nice DMG with background
         create-dmg \
             --volname "$APP_NAME" \
-            --volicon "$APP_DIR/Contents/Resources/AppIcon.icns" \
+            --volicon "$ICNS_PATH" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "$APP_NAME-$ARCH.app" 150 190 \
-            --hide-extension "$APP_NAME-$ARCH.app" \
+            --icon "$APP_NAME.app" 150 190 \
+            --hide-extension "$APP_NAME.app" \
             --app-drop-link 450 190 \
             "$DMG_PATH" \
             "$APP_DIR" \
@@ -283,11 +290,11 @@ build_macos() {
     create_dmg_file "intel"
     create_dmg_file "arm64"
 
-    # Also create tar.gz for GitHub releases
-    echo "Creating tar.gz archives..."
-    (cd "$OUTPUT_DIR" && tar -czvf "ultralog-macos-intel.tar.gz" "$APP_NAME-intel.app")
-    (cd "$OUTPUT_DIR" && tar -czvf "ultralog-macos-arm64.tar.gz" "$APP_NAME-arm64.app")
-    print_success "Created tar.gz archives"
+    # Clean up build directories
+    rm -rf "$OUTPUT_DIR/build-intel"
+    rm -rf "$OUTPUT_DIR/build-arm64"
+
+    print_success "macOS build complete"
 }
 
 # Build Linux
@@ -343,13 +350,25 @@ install_local() {
         APP_ARCH="intel"
     fi
 
-    APP_SRC="$OUTPUT_DIR/$APP_NAME-$APP_ARCH.app"
+    BUILD_DIR="$OUTPUT_DIR/build-$APP_ARCH"
+    APP_SRC="$BUILD_DIR/$APP_NAME.app"
     APP_DEST="/Applications/$APP_NAME.app"
 
-    # Check if app bundle exists
+    # Check if app bundle exists, if not build it
     if [ ! -d "$APP_SRC" ]; then
         echo "App bundle not found. Building first..."
-        build_macos
+
+        mkdir -p "$OUTPUT_DIR"
+
+        if [ "$APP_ARCH" = "arm64" ]; then
+            echo "Building aarch64-apple-darwin (Apple Silicon)..."
+            cargo build --release --target aarch64-apple-darwin
+            create_app_bundle "arm64" "$PROJECT_DIR/target/aarch64-apple-darwin/release/ultralog"
+        else
+            echo "Building x86_64-apple-darwin (Intel)..."
+            cargo build --release --target x86_64-apple-darwin
+            create_app_bundle "intel" "$PROJECT_DIR/target/x86_64-apple-darwin/release/ultralog"
+        fi
     fi
 
     # Remove old installation
