@@ -245,10 +245,10 @@ impl UltraLogApp {
         egui::ScrollArea::horizontal().show(ui, |ui| {
             ui.horizontal(|ui| {
                 for (i, card) in channel_cards.iter().enumerate() {
-                    egui::Frame::none()
+                    egui::Frame::NONE
                         .fill(egui::Color32::from_rgb(40, 40, 40))
                         .stroke(egui::Stroke::new(2.0, card.color))
-                        .rounding(5.0)
+                        .corner_radius(5)
                         .inner_margin(10.0)
                         .show(ui, |ui| {
                             ui.vertical(|ui| {

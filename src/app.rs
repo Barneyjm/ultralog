@@ -158,13 +158,13 @@ impl UltraLogApp {
         // Load Outfit Regular
         fonts.font_data.insert(
             "Outfit-Regular".to_owned(),
-            egui::FontData::from_static(include_bytes!("../assets/Outfit-Regular.ttf")),
+            egui::FontData::from_static(include_bytes!("../assets/Outfit-Regular.ttf")).into(),
         );
 
         // Load Outfit Bold
         fonts.font_data.insert(
             "Outfit-Bold".to_owned(),
-            egui::FontData::from_static(include_bytes!("../assets/Outfit-Bold.ttf")),
+            egui::FontData::from_static(include_bytes!("../assets/Outfit-Bold.ttf")).into(),
         );
 
         // Set Outfit as the primary proportional font
@@ -1114,11 +1114,11 @@ impl eframe::App for UltraLogApp {
         self.render_update_dialog(ctx);
 
         // Menu bar at top with padding
-        let menu_frame = egui::Frame::none().inner_margin(egui::Margin {
-            left: 10.0,
-            right: 10.0,
-            top: 8.0,
-            bottom: 8.0,
+        let menu_frame = egui::Frame::NONE.inner_margin(egui::Margin {
+            left: 10,
+            right: 10,
+            top: 8,
+            bottom: 8,
         });
 
         egui::TopBottomPanel::top("menu_bar")
@@ -1128,13 +1128,13 @@ impl eframe::App for UltraLogApp {
             });
 
         // Tool switcher panel (pill tabs)
-        let tool_switcher_frame = egui::Frame::none()
+        let tool_switcher_frame = egui::Frame::NONE
             .fill(egui::Color32::from_rgb(35, 35, 35))
             .inner_margin(egui::Margin {
-                left: 10.0,
-                right: 10.0,
-                top: 8.0,
-                bottom: 8.0,
+                left: 10,
+                right: 10,
+                top: 8,
+                bottom: 8,
             });
 
         egui::TopBottomPanel::top("tool_switcher")
@@ -1145,9 +1145,9 @@ impl eframe::App for UltraLogApp {
 
         // Panel background color (matches drop zone card)
         let panel_bg = egui::Color32::from_rgb(45, 45, 45);
-        let panel_frame = egui::Frame::none()
+        let panel_frame = egui::Frame::NONE
             .fill(panel_bg)
-            .inner_margin(egui::Margin::symmetric(10.0, 10.0));
+            .inner_margin(egui::Margin::symmetric(10, 10));
 
         // Left sidebar panel (always visible)
         egui::SidePanel::left("files_panel")

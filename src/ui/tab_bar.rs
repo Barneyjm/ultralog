@@ -42,23 +42,23 @@ impl UltraLogApp {
                     egui::Color32::from_rgb(60, 60, 60)
                 };
 
-                egui::Frame::none()
+                egui::Frame::NONE
                     .fill(tab_color)
-                    .rounding(egui::Rounding {
-                        nw: 6.0,
-                        ne: 6.0,
-                        sw: 0.0,
-                        se: 0.0,
+                    .corner_radius(egui::CornerRadius {
+                        nw: 6,
+                        ne: 6,
+                        sw: 0,
+                        se: 0,
                     })
                     .stroke(egui::Stroke::new(
                         if *is_active { 2.0 } else { 1.0 },
                         border_color,
                     ))
                     .inner_margin(egui::Margin {
-                        left: 12.0,
-                        right: 8.0,
-                        top: 6.0,
-                        bottom: 6.0,
+                        left: 12,
+                        right: 8,
+                        top: 6,
+                        bottom: 6,
                     })
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {

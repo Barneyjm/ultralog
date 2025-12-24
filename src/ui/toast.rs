@@ -19,18 +19,18 @@ impl UltraLogApp {
                     .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-margin, -margin))
                     .order(egui::Order::Foreground)
                     .show(ctx, |ui| {
-                        egui::Frame::none()
+                        egui::Frame::NONE
                             .fill(egui::Color32::from_rgb(
                                 bg_color[0],
                                 bg_color[1],
                                 bg_color[2],
                             ))
-                            .rounding(8.0)
-                            .inner_margin(egui::Margin::symmetric(16.0, 12.0))
+                            .corner_radius(8)
+                            .inner_margin(egui::Margin::symmetric(16, 12))
                             .shadow(egui::epaint::Shadow {
-                                offset: egui::vec2(2.0, 2.0),
-                                blur: 8.0,
-                                spread: 0.0,
+                                offset: [2, 2],
+                                blur: 8,
+                                spread: 0,
                                 color: egui::Color32::from_black_alpha(60),
                             })
                             .show(ui, |ui| {

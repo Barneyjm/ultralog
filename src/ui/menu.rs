@@ -12,7 +12,7 @@ use crate::units::{
 impl UltraLogApp {
     /// Render the application menu bar
     pub fn render_menu_bar(&mut self, ui: &mut egui::Ui) {
-        egui::menu::bar(ui, |ui| {
+        egui::MenuBar::new().ui(ui, |ui| {
             // Increase font size for menu items
             ui.style_mut()
                 .text_styles
@@ -43,7 +43,7 @@ impl UltraLogApp {
                     {
                         self.start_loading_file(path);
                     }
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 ui.separator();
@@ -59,11 +59,11 @@ impl UltraLogApp {
                             .insert(egui::TextStyle::Button, egui::FontId::proportional(14.0));
                         if ui.button("Export as PNG...").clicked() {
                             self.export_chart_png();
-                            ui.close_menu();
+                            ui.close();
                         }
                         if ui.button("Export as PDF...").clicked() {
                             self.export_chart_pdf();
-                            ui.close_menu();
+                            ui.close();
                         }
                     });
                 });
@@ -86,7 +86,7 @@ impl UltraLogApp {
                     .checkbox(&mut self.cursor_tracking, "🎯  Cursor Tracking")
                     .clicked()
                 {
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 // Color Blind Mode toggle
@@ -94,7 +94,7 @@ impl UltraLogApp {
                     .checkbox(&mut self.color_blind_mode, "👁  Color Blind Mode")
                     .clicked()
                 {
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 ui.separator();
@@ -105,13 +105,13 @@ impl UltraLogApp {
                     .on_hover_text("Standardize channel names across different ECU types")
                     .clicked()
                 {
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 // Edit mappings button
                 if ui.button("      Edit Mappings...").clicked() {
                     self.show_normalization_editor = true;
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 ui.separator();
@@ -125,7 +125,7 @@ impl UltraLogApp {
                     .on_hover_text("Automatically check for new versions when the app starts")
                     .clicked()
                 {
-                    ui.close_menu();
+                    ui.close();
                 }
             });
 
@@ -155,7 +155,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -165,7 +165,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -175,7 +175,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -193,7 +193,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -203,7 +203,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -213,7 +213,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -231,7 +231,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -241,7 +241,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -259,7 +259,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -269,7 +269,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -289,7 +289,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -299,7 +299,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -309,7 +309,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -327,7 +327,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -337,7 +337,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -355,13 +355,13 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(&mut self.unit_preferences.flow, FlowUnit::LbPerHr, "lb/hr")
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -381,7 +381,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui
                         .radio_value(
@@ -391,7 +391,7 @@ impl UltraLogApp {
                         )
                         .clicked()
                     {
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
             });
@@ -409,19 +409,19 @@ impl UltraLogApp {
 
                 if ui.button("📖  Documentation").clicked() {
                     let _ = open::that("https://github.com/SomethingNew71/UltraLog/wiki");
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 if ui.button("🐛  Report Issue").clicked() {
                     let _ = open::that("https://github.com/SomethingNew71/UltraLog/issues");
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 ui.separator();
 
                 if ui.button("💝  Support Development").clicked() {
                     let _ = open::that("https://github.com/sponsors/SomethingNew71");
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 ui.separator();
@@ -443,7 +443,7 @@ impl UltraLogApp {
                     .clicked()
                 {
                     self.start_update_check();
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 ui.separator();

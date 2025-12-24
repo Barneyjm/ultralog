@@ -48,7 +48,7 @@ impl UltraLogApp {
                     )
                     .fill(button_fill)
                     .stroke(stroke)
-                    .rounding(egui::Rounding::same(16.0))
+                    .corner_radius(egui::CornerRadius::same(16))
                     .min_size(egui::vec2(100.0, 32.0)),
                 );
 

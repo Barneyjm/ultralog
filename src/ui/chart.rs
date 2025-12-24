@@ -196,8 +196,7 @@ impl UltraLogApp {
                     let name = &legend_names[i];
 
                     plot_ui.line(
-                        Line::new(plot_points)
-                            .name(name)
+                        Line::new(name.clone(), plot_points)
                             .color(egui::Color32::from_rgb(color[0], color[1], color[2]))
                             .width(1.5),
                     );
@@ -207,10 +206,9 @@ impl UltraLogApp {
             // Draw vertical cursor line
             if let Some(time) = cursor_time {
                 plot_ui.vline(
-                    VLine::new(time)
+                    VLine::new("Cursor", time)
                         .color(egui::Color32::from_rgb(0, 255, 255)) // Cyan cursor
-                        .width(2.0)
-                        .name("Cursor"),
+                        .width(2.0),
                 );
             }
 

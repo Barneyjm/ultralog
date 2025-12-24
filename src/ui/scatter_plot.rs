@@ -620,9 +620,9 @@ impl UltraLogApp {
             ui.add_space(4.0);
 
             // Color scale legend
-            egui::Frame::none()
+            egui::Frame::NONE
                 .fill(egui::Color32::from_rgba_unmultiplied(30, 30, 30, 220))
-                .rounding(4.0)
+                .corner_radius(4)
                 .inner_margin(6.0)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -667,9 +667,9 @@ impl UltraLogApp {
 
             // Selected point legend (similar to log viewer channel display)
             if let Some(ref selected) = selected_point {
-                egui::Frame::none()
+                egui::Frame::NONE
                     .fill(egui::Color32::from_rgba_unmultiplied(30, 30, 30, 220))
-                    .rounding(4.0)
+                    .corner_radius(4)
                     .inner_margin(6.0)
                     .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 255, 255)))
                     .show(ui, |ui| {

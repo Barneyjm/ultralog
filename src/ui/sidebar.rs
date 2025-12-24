@@ -90,9 +90,9 @@ impl UltraLogApp {
                 let primary_color = egui::Color32::from_rgb(113, 120, 78); // Olive green
 
                 ui.vertical_centered(|ui| {
-                    let button_response = egui::Frame::none()
+                    let button_response = egui::Frame::NONE
                         .fill(primary_color)
-                        .rounding(6.0)
+                        .corner_radius(6)
                         .inner_margin(egui::vec2(16.0, 8.0))
                         .show(ui, |ui| {
                             ui.label(
@@ -138,9 +138,9 @@ impl UltraLogApp {
         ui.add_space(20.0);
 
         // Drop zone card
-        egui::Frame::none()
+        egui::Frame::NONE
             .fill(card_bg)
-            .rounding(12.0)
+            .corner_radius(12)
             .inner_margin(20.0)
             .show(ui, |ui| {
                 ui.vertical_centered(|ui| {
@@ -155,9 +155,9 @@ impl UltraLogApp {
                     ui.add_space(12.0);
 
                     // Select file button
-                    let button_response = egui::Frame::none()
+                    let button_response = egui::Frame::NONE
                         .fill(primary_color)
-                        .rounding(6.0)
+                        .corner_radius(6)
                         .inner_margin(egui::vec2(16.0, 8.0))
                         .show(ui, |ui| {
                             ui.label(
@@ -218,9 +218,9 @@ impl UltraLogApp {
                 && !self.get_selected_channels().is_empty()
                 && self.active_tool == ActiveTool::LogViewer
             {
-                egui::Frame::none()
+                egui::Frame::NONE
                     .fill(egui::Color32::from_rgb(35, 35, 35))
-                    .rounding(8.0)
+                    .corner_radius(8)
                     .inner_margin(10.0)
                     .show(ui, |ui| {
                         // Cursor tracking checkbox
