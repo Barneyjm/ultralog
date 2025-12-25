@@ -168,9 +168,9 @@
 
         .download-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
-            max-width: 1000px;
+            max-width: 900px;
             margin: 0 auto;
         }
 
@@ -208,9 +208,13 @@
         }
 
         .platform-icon {
-            font-size: 3rem;
+            font-size: 3.5rem;
             margin-bottom: 1rem;
-            color: #fff;
+            line-height: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 4rem;
         }
 
         .platform-icon.apple {
@@ -223,6 +227,10 @@
 
         .platform-icon.linux {
             color: #fcc624;
+        }
+
+        .platform-icon i {
+            display: inline-block;
         }
 
         .platform-name {
@@ -284,10 +292,11 @@
         .feature-icon {
             font-size: 2rem;
             margin-bottom: 1rem;
-            background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--neon-cyan);
+        }
+
+        .feature-icon i {
+            display: inline-block;
         }
 
         .feature-card h3 {
