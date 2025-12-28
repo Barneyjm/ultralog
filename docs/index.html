@@ -466,6 +466,155 @@
             color: var(--neon-yellow);
         }
 
+        /* Screenshot Carousel */
+        .screenshots-section {
+            margin-bottom: 4rem;
+        }
+
+        .screenshots-section h2 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .screenshots-section .section-subtitle {
+            text-align: center;
+            color: #a0a0b0;
+            margin-bottom: 2rem;
+        }
+
+        .carousel-container {
+            position: relative;
+            max-width: 1000px;
+            margin: 0 auto;
+            overflow: hidden;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--dark-surface);
+        }
+
+        .carousel-track {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .carousel-slide {
+            min-width: 100%;
+            position: relative;
+        }
+
+        .carousel-slide img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .carousel-slide .slide-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.5) 70%, transparent 100%);
+            text-align: center;
+        }
+
+        .carousel-slide .slide-caption h3 {
+            font-size: 1.2rem;
+            color: var(--neon-cyan);
+            margin-bottom: 0.25rem;
+        }
+
+        .carousel-slide .slide-caption p {
+            font-size: 0.9rem;
+            color: #a0a0b0;
+        }
+
+        .carousel-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 50px;
+            border: none;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .carousel-btn:hover {
+            background: rgba(0, 255, 255, 0.3);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        .carousel-btn.prev {
+            left: 1rem;
+        }
+
+        .carousel-btn.next {
+            right: 1rem;
+        }
+
+        .carousel-dots {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1.5rem;
+            background: var(--dark-surface);
+        }
+
+        .carousel-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .carousel-dot:hover {
+            border-color: var(--neon-cyan);
+        }
+
+        .carousel-dot.active {
+            background: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .carousel-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+
+            .carousel-btn.prev {
+                left: 0.5rem;
+            }
+
+            .carousel-btn.next {
+                right: 0.5rem;
+            }
+
+            .carousel-slide .slide-caption h3 {
+                font-size: 1rem;
+            }
+
+            .carousel-slide .slide-caption p {
+                font-size: 0.8rem;
+            }
+        }
+
         /* Footer */
         footer {
             text-align: center;
@@ -561,10 +710,55 @@
                 <strong>Free and open source</strong> — no subscriptions, no licenses, just download and go.
             </p>
             <div class="hero-badges">
-                <span class="version-badge">v1.2.2</span>
+                <span class="version-badge">v1.3.0</span>
                 <a href="https://github.com/SomethingNew71/UltraLog" class="opensource-badge" target="_blank">
                     <i class="fa-brands fa-github"></i> Open Source
                 </a>
+            </div>
+        </section>
+
+        <!-- Screenshots Carousel -->
+        <section class="screenshots-section">
+            <h2>See It In Action</h2>
+            <p class="section-subtitle">Explore UltraLog's powerful visualization capabilities</p>
+            <div class="carousel-container">
+                <div class="carousel-track">
+                    <div class="carousel-slide">
+                        <img src="https://raw.githubusercontent.com/SomethingNew71/UltraLog/main/assets/example1.png"
+                            alt="UltraLog multi-channel chart view">
+                        <div class="slide-caption">
+                            <h3>Multi-Channel Visualization</h3>
+                            <p>Plot up to 10 channels simultaneously with synchronized cursors</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <img src="https://raw.githubusercontent.com/SomethingNew71/UltraLog/main/assets/example2.png"
+                            alt="UltraLog channel selection">
+                        <div class="slide-caption">
+                            <h3>Intuitive Channel Selection</h3>
+                            <p>Easily browse and select from all available data channels</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <img src="https://raw.githubusercontent.com/SomethingNew71/UltraLog/main/assets/example3.png"
+                            alt="UltraLog detailed analysis">
+                        <div class="slide-caption">
+                            <h3>Detailed Data Analysis</h3>
+                            <p>Zoom, pan, and analyze your ECU data with precision</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="carousel-btn prev" aria-label="Previous slide">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button class="carousel-btn next" aria-label="Next slide">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+                <div class="carousel-dots">
+                    <button class="carousel-dot active" aria-label="Go to slide 1"></button>
+                    <button class="carousel-dot" aria-label="Go to slide 2"></button>
+                    <button class="carousel-dot" aria-label="Go to slide 3"></button>
+                </div>
             </div>
         </section>
 
@@ -711,6 +905,106 @@
                 }
             })
             .catch(() => { });
+
+        // Screenshot Carousel
+        (function() {
+            const track = document.querySelector('.carousel-track');
+            const slides = document.querySelectorAll('.carousel-slide');
+            const dots = document.querySelectorAll('.carousel-dot');
+            const prevBtn = document.querySelector('.carousel-btn.prev');
+            const nextBtn = document.querySelector('.carousel-btn.next');
+            let currentIndex = 0;
+            let autoPlayInterval;
+
+            function goToSlide(index) {
+                if (index < 0) index = slides.length - 1;
+                if (index >= slides.length) index = 0;
+                currentIndex = index;
+                track.style.transform = `translateX(-${currentIndex * 100}%)`;
+                dots.forEach((dot, i) => {
+                    dot.classList.toggle('active', i === currentIndex);
+                });
+            }
+
+            function nextSlide() {
+                goToSlide(currentIndex + 1);
+            }
+
+            function prevSlide() {
+                goToSlide(currentIndex - 1);
+            }
+
+            function startAutoPlay() {
+                autoPlayInterval = setInterval(nextSlide, 5000);
+            }
+
+            function stopAutoPlay() {
+                clearInterval(autoPlayInterval);
+            }
+
+            prevBtn.addEventListener('click', () => {
+                prevSlide();
+                stopAutoPlay();
+                startAutoPlay();
+            });
+
+            nextBtn.addEventListener('click', () => {
+                nextSlide();
+                stopAutoPlay();
+                startAutoPlay();
+            });
+
+            dots.forEach((dot, i) => {
+                dot.addEventListener('click', () => {
+                    goToSlide(i);
+                    stopAutoPlay();
+                    startAutoPlay();
+                });
+            });
+
+            // Keyboard navigation
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') {
+                    prevSlide();
+                    stopAutoPlay();
+                    startAutoPlay();
+                } else if (e.key === 'ArrowRight') {
+                    nextSlide();
+                    stopAutoPlay();
+                    startAutoPlay();
+                }
+            });
+
+            // Touch/swipe support
+            let touchStartX = 0;
+            let touchEndX = 0;
+
+            track.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+
+            track.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                const diff = touchStartX - touchEndX;
+                if (Math.abs(diff) > 50) {
+                    if (diff > 0) {
+                        nextSlide();
+                    } else {
+                        prevSlide();
+                    }
+                    stopAutoPlay();
+                    startAutoPlay();
+                }
+            }, { passive: true });
+
+            // Pause on hover
+            const container = document.querySelector('.carousel-container');
+            container.addEventListener('mouseenter', stopAutoPlay);
+            container.addEventListener('mouseleave', startAutoPlay);
+
+            // Start autoplay
+            startAutoPlay();
+        })();
     </script>
 </body>
 
