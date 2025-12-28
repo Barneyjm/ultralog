@@ -285,13 +285,9 @@ pub fn download_update(url: &str) -> DownloadResult {
 #[derive(Debug, Clone)]
 pub enum InstallResult {
     /// Installation is ready - app should exit so the updater script can run
-    ReadyToRestart {
-        message: String,
-    },
+    ReadyToRestart { message: String },
     /// macOS: DMG opened, user needs to complete installation manually
-    ManualInstallRequired {
-        message: String,
-    },
+    ManualInstallRequired { message: String },
     /// Error during installation
     Error(String),
 }
@@ -353,7 +349,9 @@ fn install_windows(archive_path: &std::path::Path) -> InstallResult {
     for i in 0..archive.len() {
         let mut file = match archive.by_index(i) {
             Ok(f) => f,
-            Err(e) => return InstallResult::Error(format!("Failed to read file from archive: {}", e)),
+            Err(e) => {
+                return InstallResult::Error(format!("Failed to read file from archive: {}", e))
+            }
         };
 
         let outpath = match file.enclosed_name() {
@@ -495,7 +493,11 @@ fn install_linux(archive_path: &std::path::Path) -> InstallResult {
     let new_exe = find_executable_in_dir(&extract_dir, "ultralog");
     let new_exe = match new_exe {
         Some(p) => p,
-        None => return InstallResult::Error("Could not find ultralog executable in extracted files".to_string()),
+        None => {
+            return InstallResult::Error(
+                "Could not find ultralog executable in extracted files".to_string(),
+            )
+        }
     };
 
     // Create shell script to replace the executable
