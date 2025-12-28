@@ -426,9 +426,7 @@ impl UltraLogApp {
 
                         // Track file load for analytics
                         let ecu_type_str = format!("{:?}", file.ecu_type);
-                        let file_size = std::fs::metadata(&file.path)
-                            .map(|m| m.len())
-                            .unwrap_or(0);
+                        let file_size = std::fs::metadata(&file.path).map(|m| m.len()).unwrap_or(0);
                         analytics::track_file_loaded(&ecu_type_str, file_size);
 
                         // Compute time range for this file
