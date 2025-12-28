@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
-use crate::parsers::{EcuMaster, EcuType, Haltech, Parseable, Speeduino};
+use crate::parsers::{EcuMaster, EcuType, Haltech, Parseable, RomRaider, Speeduino};
 use crate::state::{
     ActiveTool, CacheKey, LoadResult, LoadedFile, LoadingState, ScatterPlotConfig,
     ScatterPlotState, SelectedChannel, Tab, ToastType, CHART_COLORS, COLORBLIND_COLORS,
@@ -379,6 +379,16 @@ impl UltraLogApp {
                 Ok(l) => Ok((l, EcuType::EcuMaster)),
                 Err(e) => Err(LoadResult::Error(format!(
                     "Failed to parse ECUMaster file: {}",
+                    e
+                ))),
+            }
+        } else if RomRaider::detect(contents) {
+            // RomRaider format detected
+            let parser = RomRaider;
+            match parser.parse(contents) {
+                Ok(l) => Ok((l, EcuType::RomRaider)),
+                Err(e) => Err(LoadResult::Error(format!(
+                    "Failed to parse RomRaider file: {}",
                     e
                 ))),
             }

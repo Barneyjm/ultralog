@@ -1,10 +1,17 @@
-name: Build and Release
+name: Beta Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*-beta*'
+      - 'v*-rc*'
+      - 'v*-alpha*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Beta version tag (e.g., v1.2.3-beta.1)'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,29 +19,8 @@ env:
   APP_NAME: UltraLog
 
 jobs:
-  # Check if this is a stable release (not beta/alpha/rc)
-  check-tag:
-    name: Check Tag Type
-    runs-on: ubuntu-latest
-    outputs:
-      is_stable: ${{ steps.check.outputs.is_stable }}
-    steps:
-      - name: Check if stable release
-        id: check
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          if [[ "$TAG" =~ -(beta|alpha|rc) ]]; then
-            echo "is_stable=false" >> $GITHUB_OUTPUT
-            echo "Tag $TAG is a prerelease, skipping stable build"
-          else
-            echo "is_stable=true" >> $GITHUB_OUTPUT
-            echo "Tag $TAG is a stable release"
-          fi
-
   build-linux:
-    name: Build Linux
-    needs: check-tag
-    if: needs.check-tag.outputs.is_stable == 'true'
+    name: Build Linux (Beta)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -75,19 +61,17 @@ jobs:
           cp target/x86_64-unknown-linux-gnu/release/ultralog output/ultralog-linux
           chmod +x output/ultralog-linux
           cd output
-          tar -czvf ultralog-linux.tar.gz ultralog-linux
+          tar -czvf ultralog-linux-beta.tar.gz ultralog-linux
           rm ultralog-linux
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ultralog-linux
+          name: ultralog-linux-beta
           path: output/
 
   build-windows:
-    name: Build Windows
-    needs: check-tag
-    if: needs.check-tag.outputs.is_stable == 'true'
+    name: Build Windows (Beta)
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -105,20 +89,18 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path output
-          Copy-Item "target/x86_64-pc-windows-msvc/release/ultralog.exe" -Destination "output/ultralog-windows.exe"
-          Compress-Archive -Path "output/ultralog-windows.exe" -DestinationPath "output/ultralog-windows.zip"
-          Remove-Item "output/ultralog-windows.exe"
+          Copy-Item "target/x86_64-pc-windows-msvc/release/ultralog.exe" -Destination "output/ultralog-windows-beta.exe"
+          Compress-Archive -Path "output/ultralog-windows-beta.exe" -DestinationPath "output/ultralog-windows-beta.zip"
+          Remove-Item "output/ultralog-windows-beta.exe"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ultralog-windows
+          name: ultralog-windows-beta
           path: output/
 
   build-macos:
-    name: Build macOS (${{ matrix.arch }})
-    needs: check-tag
-    if: needs.check-tag.outputs.is_stable == 'true'
+    name: Build macOS ${{ matrix.arch }} (Beta)
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -126,10 +108,10 @@ jobs:
         include:
           - target: x86_64-apple-darwin
             arch: intel
-            asset_name: ultralog-macos-intel
+            asset_name: ultralog-macos-intel-beta
           - target: aarch64-apple-darwin
             arch: arm64
-            asset_name: ultralog-macos-arm64
+            asset_name: ultralog-macos-arm64-beta
 
     steps:
       - name: Checkout code
@@ -156,7 +138,7 @@ jobs:
         run: |
           mkdir -p output
 
-          # Create app bundle structure (named just "UltraLog.app")
+          # Create app bundle structure
           APP_DIR="output/${{ env.APP_NAME }}.app"
           mkdir -p "$APP_DIR/Contents/MacOS"
           mkdir -p "$APP_DIR/Contents/Resources"
@@ -174,9 +156,9 @@ jobs:
               <key>CFBundleName</key>
               <string>${{ env.APP_NAME }}</string>
               <key>CFBundleDisplayName</key>
-              <string>${{ env.APP_NAME }}</string>
+              <string>${{ env.APP_NAME }} (Beta)</string>
               <key>CFBundleIdentifier</key>
-              <string>com.ultralog.app</string>
+              <string>com.ultralog.app.beta</string>
               <key>CFBundleVersion</key>
               <string>${VERSION}</string>
               <key>CFBundleShortVersionString</key>
@@ -241,7 +223,7 @@ jobs:
           # Create DMG with volume icon if available
           if [ -n "$ICNS_PATH" ]; then
             create-dmg \
-              --volname "${{ env.APP_NAME }}" \
+              --volname "${{ env.APP_NAME }} Beta" \
               --volicon "$ICNS_PATH" \
               --window-pos 200 120 \
               --window-size 600 400 \
@@ -251,10 +233,10 @@ jobs:
               --app-drop-link 450 190 \
               "output/${{ matrix.asset_name }}.dmg" \
               "$APP_DIR" || \
-              hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder "$APP_DIR" -ov -format UDZO "output/${{ matrix.asset_name }}.dmg"
+              hdiutil create -volname "${{ env.APP_NAME }} Beta" -srcfolder "$APP_DIR" -ov -format UDZO "output/${{ matrix.asset_name }}.dmg"
           else
             create-dmg \
-              --volname "${{ env.APP_NAME }}" \
+              --volname "${{ env.APP_NAME }} Beta" \
               --window-pos 200 120 \
               --window-size 600 400 \
               --icon-size 100 \
@@ -263,7 +245,7 @@ jobs:
               --app-drop-link 450 190 \
               "output/${{ matrix.asset_name }}.dmg" \
               "$APP_DIR" || \
-              hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder "$APP_DIR" -ov -format UDZO "output/${{ matrix.asset_name }}.dmg"
+              hdiutil create -volname "${{ env.APP_NAME }} Beta" -srcfolder "$APP_DIR" -ov -format UDZO "output/${{ matrix.asset_name }}.dmg"
           fi
 
       - name: Upload artifact
@@ -273,14 +255,18 @@ jobs:
           path: output/*.dmg
 
   release:
-    name: Create Release
-    needs: [check-tag, build-linux, build-windows, build-macos]
+    name: Create Beta Release
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') && needs.check-tag.outputs.is_stable == 'true'
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
 
     steps:
+      - name: Get tag name
+        id: tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -291,35 +277,50 @@ jobs:
           echo "Artifacts structure:"
           ls -laR artifacts/
 
-      - name: Create release
+      - name: Create beta release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/ultralog-macos-intel/*.dmg
-            artifacts/ultralog-macos-arm64/*.dmg
-            artifacts/ultralog-windows/*.zip
-            artifacts/ultralog-linux/*.tar.gz
+            artifacts/ultralog-macos-intel-beta/*.dmg
+            artifacts/ultralog-macos-arm64-beta/*.dmg
+            artifacts/ultralog-windows-beta/*.zip
+            artifacts/ultralog-linux-beta/*.tar.gz
           draft: false
-          prerelease: false
+          prerelease: true
+          name: "${{ steps.tag.outputs.TAG }} (Beta)"
           generate_release_notes: true
           body: |
+            ## Beta Release
+
+            **This is a pre-release version for testing purposes.**
+
+            This build may contain experimental features, bugs, or incomplete functionality.
+            Please report any issues you encounter on [GitHub Issues](https://github.com/${{ github.repository }}/issues).
+
+            ---
+
             ## Installation
 
             ### macOS
             1. Download the appropriate `.dmg` file for your Mac:
-               - **Intel Mac**: `ultralog-macos-intel.dmg`
-               - **Apple Silicon (M1/M2/M3/M4)**: `ultralog-macos-arm64.dmg`
+               - **Intel Mac**: `ultralog-macos-intel-beta.dmg`
+               - **Apple Silicon (M1/M2/M3/M4)**: `ultralog-macos-arm64-beta.dmg`
             2. Open the DMG and drag UltraLog to your Applications folder
             3. On first run, right-click the app and select "Open" to bypass Gatekeeper
 
             ### Windows
-            1. Download `ultralog-windows.zip`
+            1. Download `ultralog-windows-beta.zip`
             2. Extract the zip file
-            3. Run `ultralog-windows.exe`
+            3. Run `ultralog-windows-beta.exe`
 
             ### Linux
-            1. Download `ultralog-linux.tar.gz`
-            2. Extract: `tar -xzf ultralog-linux.tar.gz`
+            1. Download `ultralog-linux-beta.tar.gz`
+            2. Extract: `tar -xzf ultralog-linux-beta.tar.gz`
             3. Run: `./ultralog-linux`
+
+            ---
+
+            **Note:** Beta releases are not shown by default in the releases list.
+            Users must explicitly opt-in to view pre-releases.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

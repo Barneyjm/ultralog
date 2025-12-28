@@ -3,6 +3,7 @@ use std::error::Error;
 
 use super::ecumaster::{EcuMasterChannel, EcuMasterMeta};
 use super::haltech::{HaltechChannel, HaltechMeta};
+use super::romraider::{RomRaiderChannel, RomRaiderMeta};
 use super::speeduino::{SpeeduinoChannel, SpeeduinoMeta};
 
 /// Metadata enum supporting different ECU formats
@@ -10,6 +11,7 @@ use super::speeduino::{SpeeduinoChannel, SpeeduinoMeta};
 pub enum Meta {
     Haltech(HaltechMeta),
     EcuMaster(EcuMasterMeta),
+    RomRaider(RomRaiderMeta),
     Speeduino(SpeeduinoMeta),
     #[default]
     Empty,
@@ -20,6 +22,7 @@ pub enum Meta {
 pub enum Channel {
     Haltech(HaltechChannel),
     EcuMaster(EcuMasterChannel),
+    RomRaider(RomRaiderChannel),
     Speeduino(SpeeduinoChannel),
 }
 
@@ -31,6 +34,7 @@ impl Serialize for Channel {
         match self {
             Channel::Haltech(h) => h.serialize(serializer),
             Channel::EcuMaster(e) => e.serialize(serializer),
+            Channel::RomRaider(r) => r.serialize(serializer),
             Channel::Speeduino(s) => s.serialize(serializer),
         }
     }
@@ -41,6 +45,7 @@ impl Channel {
         match self {
             Channel::Haltech(h) => h.name.clone(),
             Channel::EcuMaster(e) => e.name.clone(),
+            Channel::RomRaider(r) => r.name.clone(),
             Channel::Speeduino(s) => s.name.clone(),
         }
     }
@@ -50,6 +55,7 @@ impl Channel {
         match self {
             Channel::Haltech(h) => h.id.clone(),
             Channel::EcuMaster(e) => e.path.clone(),
+            Channel::RomRaider(r) => r.name.clone(),
             Channel::Speeduino(s) => s.name.clone(),
         }
     }
@@ -58,6 +64,7 @@ impl Channel {
         match self {
             Channel::Haltech(h) => h.r#type.as_ref().to_string(),
             Channel::EcuMaster(e) => e.path.clone(),
+            Channel::RomRaider(_) => "RomRaider".to_string(),
             Channel::Speeduino(_) => "Speeduino/rusEFI".to_string(),
         }
     }
@@ -66,6 +73,7 @@ impl Channel {
         match self {
             Channel::Haltech(h) => h.display_min,
             Channel::EcuMaster(_) => None,
+            Channel::RomRaider(_) => None,
             Channel::Speeduino(_) => None,
         }
     }
@@ -74,6 +82,7 @@ impl Channel {
         match self {
             Channel::Haltech(h) => h.display_max,
             Channel::EcuMaster(_) => None,
+            Channel::RomRaider(_) => None,
             Channel::Speeduino(_) => None,
         }
     }
@@ -82,6 +91,7 @@ impl Channel {
         match self {
             Channel::Haltech(h) => h.unit(),
             Channel::EcuMaster(e) => e.unit(),
+            Channel::RomRaider(r) => r.unit(),
             Channel::Speeduino(s) => s.unit(),
         }
     }
@@ -166,6 +176,7 @@ pub enum EcuType {
     MaxxEcu,
     MotEc,
     Link,
+    RomRaider,
     Speeduino,
     Unknown,
 }
@@ -180,6 +191,7 @@ impl EcuType {
             EcuType::MaxxEcu => "MaxxECU",
             EcuType::MotEc => "MoTeC",
             EcuType::Link => "Link",
+            EcuType::RomRaider => "RomRaider",
             EcuType::Speeduino => "Speeduino/rusEFI",
             EcuType::Unknown => "Unknown",
         }
