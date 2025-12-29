@@ -66,7 +66,8 @@ jobs:
             libxcb1-dev \
             libxcb-randr0-dev \
             libxcb-xkb-dev \
-            libx11-xcb-dev
+            libx11-xcb-dev \
+            libxml2-dev
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
@@ -129,7 +130,14 @@ jobs:
             libxcb1-dev \
             libxcb-randr0-dev \
             libxcb-xkb-dev \
-            libx11-xcb-dev
+            libx11-xcb-dev \
+            libxml2-dev
+
+      - name: Install Windows dependencies
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install libxml2 -y
+          echo "LIBXML2_DIR=C:\tools\libxml2" >> $env:GITHUB_ENV
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
@@ -194,7 +202,14 @@ jobs:
             libxcb1-dev \
             libxcb-randr0-dev \
             libxcb-xkb-dev \
-            libx11-xcb-dev
+            libx11-xcb-dev \
+            libxml2-dev
+
+      - name: Install Windows dependencies
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install libxml2 -y
+          echo "LIBXML2_DIR=C:\tools\libxml2" >> $env:GITHUB_ENV
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
@@ -261,7 +276,8 @@ jobs:
             libxcb1-dev \
             libxcb-randr0-dev \
             libxcb-xkb-dev \
-            libx11-xcb-dev
+            libx11-xcb-dev \
+            libxml2-dev
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
