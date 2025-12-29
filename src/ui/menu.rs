@@ -401,6 +401,113 @@ impl UltraLogApp {
                 });
             });
 
+            // Analysis menu (LLM and Anomaly Detection)
+            ui.menu_button("Analysis", |ui| {
+                ui.set_min_width(220.0);
+
+                // Increase font size for dropdown items
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Button, egui::FontId::proportional(14.0));
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
+
+                // LLM Section Header
+                ui.label(
+                    egui::RichText::new("LLM Assistant")
+                        .small()
+                        .color(egui::Color32::GRAY),
+                );
+
+                // Toggle LLM panel
+                let llm_label = if self.llm_config.enabled {
+                    if self.show_llm_panel {
+                        "🤖  Hide LLM Panel"
+                    } else {
+                        "🤖  Show LLM Panel"
+                    }
+                } else {
+                    "🤖  LLM Panel (disabled)"
+                };
+
+                if ui
+                    .add_enabled(self.llm_config.enabled, egui::Button::new(llm_label))
+                    .clicked()
+                {
+                    self.show_llm_panel = !self.show_llm_panel;
+                    ui.close();
+                }
+
+                // LLM Settings
+                if ui.button("⚙️  LLM Settings...").clicked() {
+                    self.show_llm_settings = true;
+                    ui.close();
+                }
+
+                ui.separator();
+
+                // Anomaly Detection Section Header
+                ui.label(
+                    egui::RichText::new("Anomaly Detection")
+                        .small()
+                        .color(egui::Color32::GRAY),
+                );
+
+                // Toggle anomaly detection
+                if ui
+                    .checkbox(&mut self.anomaly_config.enabled, "🔍  Enable Detection")
+                    .on_hover_text("Run local anomaly detection algorithms on selected channels")
+                    .clicked()
+                {
+                    ui.close();
+                }
+
+                // Run detection manually
+                let has_channels = !self.get_selected_channels().is_empty();
+                if ui
+                    .add_enabled(
+                        has_channels && self.anomaly_config.enabled,
+                        egui::Button::new("▶  Run Detection Now"),
+                    )
+                    .on_hover_text("Analyze selected channels for anomalies")
+                    .clicked()
+                {
+                    self.run_anomaly_detection();
+                    ui.close();
+                }
+
+                // Show/hide anomaly markers
+                if ui
+                    .add_enabled(
+                        self.anomaly_results.is_some(),
+                        egui::Checkbox::new(&mut self.show_anomaly_markers, "📍  Show Markers on Chart"),
+                    )
+                    .clicked()
+                {
+                    ui.close();
+                }
+
+                // Show anomaly count if available
+                if let Some(ref results) = self.anomaly_results {
+                    ui.separator();
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Found: {} anomalies",
+                            results.anomalies.len()
+                        ))
+                        .small()
+                        .color(if results.critical_count > 0 {
+                            egui::Color32::from_rgb(255, 100, 100)
+                        } else if results.warning_count > 0 {
+                            egui::Color32::from_rgb(255, 200, 100)
+                        } else {
+                            egui::Color32::LIGHT_BLUE
+                        }),
+                    );
+                }
+            });
+
             ui.menu_button("Help", |ui| {
                 ui.set_min_width(200.0);
 

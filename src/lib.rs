@@ -12,6 +12,8 @@
 //! - [`normalize`] - Field name normalization for standardizing channel names
 //! - [`updater`] - Auto-update functionality for checking and downloading updates
 //! - [`analytics`] - Anonymous usage analytics via PostHog
+//! - [`anomaly`] - Local anomaly detection algorithms for ECU data
+//! - [`llm`] - Optional LLM integration for AI-assisted analysis
 //! - [`ui`] - User interface components
 //!   - `sidebar` - File list and view options
 //!   - `channels` - Channel selection and display
@@ -22,7 +24,9 @@
 //!   - `icons` - Custom icon drawing utilities
 
 pub mod analytics;
+pub mod anomaly;
 pub mod app;
+pub mod llm;
 pub mod normalize;
 pub mod parsers;
 pub mod state;

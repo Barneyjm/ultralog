@@ -5,7 +5,8 @@ use std::fs::File;
 use std::io::BufWriter;
 
 // Use fully qualified path to disambiguate from printpdf's image module
-use ::image::{Rgba, RgbaImage};
+use ::image::codecs::png::PngEncoder;
+use ::image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage};
 
 use crate::analytics;
 use crate::app::UltraLogApp;
@@ -351,6 +352,120 @@ impl UltraLogApp {
         doc.save(&mut writer)?;
 
         Ok(())
+    }
+
+    /// Render chart data to PNG bytes (for LLM vision analysis)
+    /// Returns smaller resolution than export for efficiency
+    pub fn render_chart_to_bytes(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let width = 1280u32;
+        let height = 720u32;
+
+        // Create image buffer
+        let mut imgbuf = RgbaImage::new(width, height);
+
+        // Fill with dark background
+        for pixel in imgbuf.pixels_mut() {
+            *pixel = Rgba([30, 30, 30, 255]);
+        }
+
+        // Draw chart area background
+        let chart_left = 60u32;
+        let chart_right = width - 30;
+        let chart_top = 40u32;
+        let chart_bottom = height - 60;
+
+        for y in chart_top..chart_bottom {
+            for x in chart_left..chart_right {
+                imgbuf.put_pixel(x, y, Rgba([40, 40, 40, 255]));
+            }
+        }
+
+        // Get time range
+        let Some((min_time, max_time)) = self.time_range else {
+            return Err("No time range available".into());
+        };
+
+        let time_span = max_time - min_time;
+        if time_span <= 0.0 {
+            return Err("Invalid time range".into());
+        }
+
+        let chart_width = (chart_right - chart_left) as f64;
+        let chart_height = (chart_bottom - chart_top) as f64;
+
+        // Draw each channel
+        for selected in self.get_selected_channels() {
+            let color = self.get_channel_color(selected.color_index);
+            let pixel_color = Rgba([color[0], color[1], color[2], 255]);
+
+            // Get channel data
+            if selected.file_index >= self.files.len() {
+                continue;
+            }
+            let file = &self.files[selected.file_index];
+            let times = file.log.get_times_as_f64();
+            let data = file.log.get_channel_data(selected.channel_index);
+
+            if data.is_empty() {
+                continue;
+            }
+
+            // Find min/max for normalization
+            let mut data_min = f64::MAX;
+            let mut data_max = f64::MIN;
+            for &val in &data {
+                data_min = data_min.min(val);
+                data_max = data_max.max(val);
+            }
+
+            let data_range = if (data_max - data_min).abs() < 0.0001 {
+                1.0
+            } else {
+                data_max - data_min
+            };
+
+            // Draw data points as lines (with downsampling for efficiency)
+            let step = (times.len() / 1000).max(1);
+            let mut prev_x: Option<u32> = None;
+            let mut prev_y: Option<u32> = None;
+
+            for (i, (&time, &value)) in times.iter().zip(data.iter()).enumerate() {
+                if i % step != 0 {
+                    continue;
+                }
+
+                // Skip points outside time range
+                if time < min_time || time > max_time {
+                    continue;
+                }
+
+                let x_ratio = (time - min_time) / time_span;
+                let y_ratio = (value - data_min) / data_range;
+
+                let x = chart_left + (x_ratio * chart_width) as u32;
+                let y = chart_bottom - (y_ratio * chart_height) as u32;
+
+                // Draw line from previous point
+                if let (Some(px), Some(py)) = (prev_x, prev_y) {
+                    draw_line(&mut imgbuf, px, py, x, y, pixel_color);
+                }
+
+                prev_x = Some(x);
+                prev_y = Some(y);
+            }
+        }
+
+        // Encode to PNG bytes
+        let mut buffer = Vec::new();
+        let encoder = PngEncoder::new(&mut buffer);
+        encoder.write_image(
+            imgbuf.as_raw(),
+            width,
+            height,
+            ExtendedColorType::Rgba8,
+        )?;
+
+        Ok(buffer)
     }
 }
 

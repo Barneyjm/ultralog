@@ -14,11 +14,13 @@
 //! - `scatter_plot` - Scatter plot visualization view
 //! - `tab_bar` - Chrome-style tabs for managing multiple log files
 //! - `update_dialog` - Auto-update dialog window
+//! - `llm_panel` - LLM assistant settings and analysis panel
 
 pub mod channels;
 pub mod chart;
 pub mod export;
 pub mod icons;
+pub mod llm_panel;
 pub mod menu;
 pub mod normalization_editor;
 pub mod scatter_plot;

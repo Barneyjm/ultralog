@@ -3550,9 +3550,10 @@ dependencies = [
 
 [[package]]
 name = "ultralog"
-version = "1.4.1"
+version = "1.4.3"
 dependencies = [
  "anyhow",
+ "base64",
  "eframe",
  "egui_extras",
  "egui_plot",

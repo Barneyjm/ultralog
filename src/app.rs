@@ -12,6 +12,8 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use crate::analytics;
+use crate::anomaly::{AnomalyConfig, AnomalyResults};
+use crate::llm::{LlmConfig, LlmRequest, LlmRequestState, LlmResponse};
 use crate::parsers::{EcuMaster, EcuType, Haltech, Parseable, RomRaider, Speeduino};
 use crate::state::{
     ActiveTool, CacheKey, LoadResult, LoadedFile, LoadingState, ScatterPlotConfig,
@@ -108,6 +110,30 @@ pub struct UltraLogApp {
     startup_check_done: bool,
     /// Set to true when the app should exit for an update to be applied
     pub(crate) should_exit_for_update: bool,
+    // === LLM Integration ===
+    /// Configuration for LLM-assisted analysis
+    pub(crate) llm_config: LlmConfig,
+    /// Whether to show the LLM settings modal
+    pub(crate) show_llm_settings: bool,
+    /// Current state of LLM request
+    pub(crate) llm_request_state: LlmRequestState,
+    /// Sender for LLM requests to background worker
+    pub(crate) llm_request_sender: Option<Sender<LlmRequest>>,
+    /// Receiver for LLM responses from background worker
+    pub(crate) llm_response_receiver: Option<Receiver<LlmResponse>>,
+    /// Last LLM analysis result (for display)
+    pub(crate) llm_last_result: Option<String>,
+    /// Whether to show the LLM analysis panel
+    pub(crate) show_llm_panel: bool,
+    /// User prompt input for LLM analysis
+    pub(crate) llm_user_prompt: String,
+    // === Anomaly Detection ===
+    /// Configuration for local anomaly detection
+    pub(crate) anomaly_config: AnomalyConfig,
+    /// Results from last anomaly detection run
+    pub(crate) anomaly_results: Option<AnomalyResults>,
+    /// Whether anomaly markers are shown on chart
+    pub(crate) show_anomaly_markers: bool,
 }
 
 impl Default for UltraLogApp {
@@ -149,6 +175,19 @@ impl Default for UltraLogApp {
             auto_check_updates: true, // Enabled by default
             startup_check_done: false,
             should_exit_for_update: false,
+            // LLM Integration (disabled by default)
+            llm_config: LlmConfig::default(),
+            show_llm_settings: false,
+            llm_request_state: LlmRequestState::default(),
+            llm_request_sender: None,
+            llm_response_receiver: None,
+            llm_last_result: None,
+            show_llm_panel: false,
+            llm_user_prompt: "Analyze this data for any issues or anomalies.".to_string(),
+            // Anomaly Detection (enabled by default)
+            anomaly_config: AnomalyConfig::default(),
+            anomaly_results: None,
+            show_anomaly_markers: true,
         }
     }
 }
@@ -1114,6 +1153,9 @@ impl eframe::App for UltraLogApp {
         // Check for completed background loads
         self.check_loading_complete();
 
+        // Poll for LLM responses
+        self.poll_llm_responses();
+
         // Handle file drops
         self.handle_dropped_files(ctx);
 
@@ -1126,12 +1168,13 @@ impl eframe::App for UltraLogApp {
         // Apply dark theme
         ctx.set_visuals(egui::Visuals::dark());
 
-        // Request repaint while loading or updating (for spinner animation)
+        // Request repaint while loading, updating, or waiting for LLM (for spinner animation)
         if matches!(self.loading_state, LoadingState::Loading(_))
             || matches!(
                 self.update_state,
                 UpdateState::Checking | UpdateState::Downloading
             )
+            || matches!(self.llm_request_state, LlmRequestState::Pending)
         {
             ctx.request_repaint();
         }
@@ -1142,6 +1185,7 @@ impl eframe::App for UltraLogApp {
         // Modal windows
         self.render_normalization_editor(ctx);
         self.render_update_dialog(ctx);
+        self.render_llm_settings(ctx);
 
         // Menu bar at top with padding
         let menu_frame = egui::Frame::NONE.inner_margin(egui::Margin {
@@ -1190,6 +1234,9 @@ impl eframe::App for UltraLogApp {
 
         // Right panel for channel selection (only in Log Viewer mode)
         if self.active_tool == ActiveTool::LogViewer {
+            // LLM Analysis panel (optional, shown when enabled)
+            self.render_llm_panel(ctx);
+
             egui::SidePanel::right("channels_panel")
                 .default_width(300.0)
                 .min_width(200.0)
