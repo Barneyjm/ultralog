@@ -12,7 +12,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use crate::analytics;
-use crate::parsers::{EcuMaster, EcuType, Haltech, Parseable, RomRaider, Speeduino};
+use crate::parsers::{EcuMaster, EcuType, Haltech, Link, Parseable, RomRaider, Speeduino};
 use crate::state::{
     ActiveTool, CacheKey, LoadResult, LoadedFile, LoadingState, ScatterPlotConfig,
     ScatterPlotState, SelectedChannel, Tab, ToastType, CHART_COLORS, COLORBLIND_COLORS,
@@ -356,6 +356,15 @@ impl UltraLogApp {
                 Ok(l) => Ok((l, EcuType::Speeduino)),
                 Err(e) => Err(LoadResult::Error(format!(
                     "Failed to parse Speeduino/rusEFI MLG file: {}",
+                    e
+                ))),
+            }
+        } else if Link::detect(binary_data) {
+            // Link ECU LLG format detected (binary)
+            match Link::parse_binary(binary_data) {
+                Ok(l) => Ok((l, EcuType::Link)),
+                Err(e) => Err(LoadResult::Error(format!(
+                    "Failed to parse Link ECU LLG file: {}",
                     e
                 ))),
             }
