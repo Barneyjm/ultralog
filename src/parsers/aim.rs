@@ -465,20 +465,18 @@ impl Aim {
     }
 
     /// Find a byte pattern in data starting from offset
+    #[allow(dead_code)]
     fn find_pattern(data: &[u8], pattern: &[u8], start: usize) -> Option<usize> {
         if start >= data.len() || pattern.is_empty() {
             return None;
         }
 
-        for i in start..data.len().saturating_sub(pattern.len() - 1) {
-            if &data[i..i + pattern.len()] == pattern {
-                return Some(i);
-            }
-        }
-        None
+        (start..data.len().saturating_sub(pattern.len() - 1))
+            .find(|&i| &data[i..i + pattern.len()] == pattern)
     }
 
     /// Read a null-terminated string from a byte slice, up to max_len bytes
+    #[allow(dead_code)]
     fn read_null_terminated_string(data: &[u8], max_len: usize) -> String {
         let max = max_len.min(data.len());
         let end = data[..max].iter().position(|&b| b == 0).unwrap_or(max);

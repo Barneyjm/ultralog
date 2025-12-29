@@ -1201,7 +1201,7 @@ impl eframe::App for UltraLogApp {
         egui::SidePanel::left("files_panel")
             .default_width(200.0)
             .resizable(true)
-            .frame(panel_frame.clone())
+            .frame(panel_frame)
             .show(ctx, |ui| {
                 self.render_sidebar(ui);
             });

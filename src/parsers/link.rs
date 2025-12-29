@@ -207,7 +207,7 @@ impl Link {
                 let time = Self::read_f32(data, pos + 4);
 
                 // Filter for reasonable values
-                if time >= 0.0 && time < 100000.0 && value.is_finite() && value.abs() < 1e10 {
+                if (0.0..100000.0).contains(&time) && value.is_finite() && value.abs() < 1e10 {
                     points.push((time, value));
                     if !all_times.contains(&time) {
                         all_times.push(time);
