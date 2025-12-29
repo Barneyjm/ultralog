@@ -48,20 +48,29 @@ impl Aim {
     }
 
     /// Parse AIM XRK/DRK file from a file path
-    #[cfg(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64"))]
+    #[cfg(all(
+        any(target_os = "windows", target_os = "linux"),
+        target_arch = "x86_64"
+    ))]
     pub fn parse_file(path: &Path) -> Result<Log, Box<dyn Error>> {
         Self::parse_file_xdrk(path)
     }
 
     /// Parse AIM XRK/DRK file from a file path (pure Rust implementation for unsupported platforms)
-    #[cfg(not(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64")))]
+    #[cfg(not(all(
+        any(target_os = "windows", target_os = "linux"),
+        target_arch = "x86_64"
+    )))]
     pub fn parse_file(path: &Path) -> Result<Log, Box<dyn Error>> {
         let data = std::fs::read(path)?;
         Self::parse_binary(&data)
     }
 
     /// Parse using xdrk library (Windows/Linux x86_64 only)
-    #[cfg(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64"))]
+    #[cfg(all(
+        any(target_os = "windows", target_os = "linux"),
+        target_arch = "x86_64"
+    ))]
     fn parse_file_xdrk(path: &Path) -> Result<Log, Box<dyn Error>> {
         // Load the XRK file using xdrk
         let run = xdrk::Run::load(path)?;
@@ -89,7 +98,9 @@ impl Aim {
         let mut channels = Vec::with_capacity(channel_count);
 
         for i in 0..channel_count {
-            let name = run.channel_name(i).unwrap_or_else(|_| format!("Channel_{}", i));
+            let name = run
+                .channel_name(i)
+                .unwrap_or_else(|_| format!("Channel_{}", i));
             let unit = run.channel_unit(i).unwrap_or_default();
             channels.push(AimChannel { name, unit });
         }
@@ -116,7 +127,10 @@ impl Aim {
             tracing::warn!("No samples found in AIM log file");
             return Ok(Log {
                 meta: Meta::Aim(meta),
-                channels: channels.into_iter().map(super::types::Channel::Aim).collect(),
+                channels: channels
+                    .into_iter()
+                    .map(super::types::Channel::Aim)
+                    .collect(),
                 times,
                 data,
             });
@@ -161,7 +175,10 @@ impl Aim {
 
         Ok(Log {
             meta: Meta::Aim(meta),
-            channels: channels.into_iter().map(super::types::Channel::Aim).collect(),
+            channels: channels
+                .into_iter()
+                .map(super::types::Channel::Aim)
+                .collect(),
             times,
             data,
         })
@@ -169,13 +186,19 @@ impl Aim {
 
     /// Parse XRK binary data using pure Rust implementation
     /// This is used on platforms where xdrk is not available (macOS, ARM, etc.)
-    #[cfg(not(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64")))]
+    #[cfg(not(all(
+        any(target_os = "windows", target_os = "linux"),
+        target_arch = "x86_64"
+    )))]
     fn parse_binary(data: &[u8]) -> Result<Log, Box<dyn Error>> {
         if !Self::detect(data) {
             return Err("Not a valid AIM XRK file".into());
         }
 
-        tracing::info!("Parsing AIM XRK file using pure Rust implementation ({} bytes)", data.len());
+        tracing::info!(
+            "Parsing AIM XRK file using pure Rust implementation ({} bytes)",
+            data.len()
+        );
 
         // Parse channels from the XRK binary format
         let channels = Self::parse_channels(data)?;
@@ -191,14 +214,20 @@ impl Aim {
 
         Ok(Log {
             meta: Meta::Aim(meta),
-            channels: channels.into_iter().map(super::types::Channel::Aim).collect(),
+            channels: channels
+                .into_iter()
+                .map(super::types::Channel::Aim)
+                .collect(),
             times,
             data: channel_data,
         })
     }
 
     /// Parse channel definitions from XRK data
-    #[cfg(not(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64")))]
+    #[cfg(not(all(
+        any(target_os = "windows", target_os = "linux"),
+        target_arch = "x86_64"
+    )))]
     fn parse_channels(data: &[u8]) -> Result<Vec<AimChannel>, Box<dyn Error>> {
         let mut channels = Vec::new();
 
@@ -279,7 +308,10 @@ impl Aim {
     }
 
     /// Parse metadata from the XRK file footer
-    #[cfg(not(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64")))]
+    #[cfg(not(all(
+        any(target_os = "windows", target_os = "linux"),
+        target_arch = "x86_64"
+    )))]
     fn parse_metadata(data: &[u8]) -> Result<AimMeta, Box<dyn Error>> {
         let mut meta = AimMeta::default();
 
@@ -289,7 +321,8 @@ impl Aim {
             if start + 50 < data.len() {
                 // Skip length bytes and read vehicle name
                 if let Some(end) = Self::find_pattern(&data[start..], b"<", 0) {
-                    meta.vehicle = Self::read_null_terminated_string(&data[start + 4..], end.min(50));
+                    meta.vehicle =
+                        Self::read_null_terminated_string(&data[start + 4..], end.min(50));
                 }
             }
         }
@@ -299,7 +332,8 @@ impl Aim {
             let start = pos + 5;
             if start + 100 < data.len() {
                 if let Some(end) = Self::find_pattern(&data[start..], b"<", 0) {
-                    meta.championship = Self::read_null_terminated_string(&data[start + 4..], end.min(100));
+                    meta.championship =
+                        Self::read_null_terminated_string(&data[start + 4..], end.min(100));
                 }
             }
         }
@@ -309,7 +343,8 @@ impl Aim {
             let start = pos + 5;
             if start + 50 < data.len() {
                 if let Some(end) = Self::find_pattern(&data[start..], b"<", 0) {
-                    meta.venue_type = Self::read_null_terminated_string(&data[start + 4..], end.min(50));
+                    meta.venue_type =
+                        Self::read_null_terminated_string(&data[start + 4..], end.min(50));
                 }
             }
         }
@@ -318,8 +353,14 @@ impl Aim {
     }
 
     /// Parse channel data samples from )(G records
-    #[cfg(not(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64")))]
-    fn parse_channel_data(data: &[u8], channel_count: usize) -> Result<(Vec<f64>, Vec<Vec<Value>>), Box<dyn Error>> {
+    #[cfg(not(all(
+        any(target_os = "windows", target_os = "linux"),
+        target_arch = "x86_64"
+    )))]
+    fn parse_channel_data(
+        data: &[u8],
+        channel_count: usize,
+    ) -> Result<(Vec<f64>, Vec<Vec<Value>>), Box<dyn Error>> {
         let mut times = Vec::new();
         let mut all_data: Vec<Vec<Value>> = Vec::new();
 
@@ -340,8 +381,7 @@ impl Aim {
         while offset + 20 < data.len() {
             if let Some(pos) = Self::find_pattern(data, marker, offset) {
                 // Find the next marker to determine record size
-                let next_pos = Self::find_pattern(data, b")(", pos + 3)
-                    .unwrap_or(data.len());
+                let next_pos = Self::find_pattern(data, b")(", pos + 3).unwrap_or(data.len());
                 let record_size = next_pos - pos;
 
                 // Process records in the typical telemetry size range (100-200 bytes)
@@ -441,14 +481,9 @@ impl Aim {
     /// Read a null-terminated string from a byte slice, up to max_len bytes
     fn read_null_terminated_string(data: &[u8], max_len: usize) -> String {
         let max = max_len.min(data.len());
-        let end = data[..max]
-            .iter()
-            .position(|&b| b == 0)
-            .unwrap_or(max);
+        let end = data[..max].iter().position(|&b| b == 0).unwrap_or(max);
 
-        String::from_utf8_lossy(&data[..end])
-            .trim()
-            .to_string()
+        String::from_utf8_lossy(&data[..end]).trim().to_string()
     }
 }
 
@@ -543,7 +578,11 @@ mod tests {
 
             // Verify detection
             let data = std::fs::read(&path).expect("Failed to read file");
-            assert!(Aim::detect(&data), "Should detect {} as XRK format", path.display());
+            assert!(
+                Aim::detect(&data),
+                "Should detect {} as XRK format",
+                path.display()
+            );
 
             // Parse the file
             match Aim::parse_file(&path) {
@@ -552,9 +591,21 @@ mod tests {
                     eprintln!("  Data records: {}", log.data.len());
 
                     // Verify we got actual data
-                    assert!(!log.channels.is_empty(), "Should have channels for {}", path.display());
-                    assert!(!log.data.is_empty(), "Should have data records for {}", path.display());
-                    assert!(!log.times.is_empty(), "Should have timestamps for {}", path.display());
+                    assert!(
+                        !log.channels.is_empty(),
+                        "Should have channels for {}",
+                        path.display()
+                    );
+                    assert!(
+                        !log.data.is_empty(),
+                        "Should have data records for {}",
+                        path.display()
+                    );
+                    assert!(
+                        !log.times.is_empty(),
+                        "Should have timestamps for {}",
+                        path.display()
+                    );
 
                     if !log.times.is_empty() {
                         eprintln!(
@@ -565,10 +616,15 @@ mod tests {
                     }
 
                     // Verify data has actual values
-                    let has_non_zero = log.data.iter().any(|row| {
-                        row.iter().any(|v| v.as_f64().abs() > 0.0001)
-                    });
-                    assert!(has_non_zero, "Should have non-zero values for {}", path.display());
+                    let has_non_zero = log
+                        .data
+                        .iter()
+                        .any(|row| row.iter().any(|v| v.as_f64().abs() > 0.0001));
+                    assert!(
+                        has_non_zero,
+                        "Should have non-zero values for {}",
+                        path.display()
+                    );
 
                     parsed_count += 1;
                 }
