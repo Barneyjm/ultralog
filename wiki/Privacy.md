@@ -6,7 +6,7 @@ UltraLog respects your privacy while collecting minimal, anonymous usage data to
 
 ## Overview
 
-Starting with version 1.5.1, UltraLog includes optional anonymous analytics powered by [PostHog](https://posthog.com/). This data helps the development team understand how the application is used and prioritize new features.
+Starting with version 1.5.0, UltraLog includes optional anonymous analytics powered by [PostHog](https://posthog.com/). This data helps the development team understand how the application is used and prioritize new features.
 
 **Key Privacy Principles:**
 
@@ -36,7 +36,7 @@ UltraLog collects the following anonymous usage events:
 ### Common Properties
 
 Every event includes:
-- **App version** (e.g., "1.5.1")
+- **App version** (e.g., "1.6.0")
 - **Platform** (windows, macos, or linux)
 - **Anonymous session ID** (random UUID, not persistent)
 
