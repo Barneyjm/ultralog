@@ -345,7 +345,7 @@ impl UltraLogApp {
             ));
         }
 
-        // Check for AIM XRK format - parse using xdrk library (requires file path)
+        // Check for AIM XRK format - parse using pure Rust implementation
         if Aim::detect(binary_data) {
             match Aim::parse_file(path) {
                 Ok(l) => return Ok((l, EcuType::Aim)),
