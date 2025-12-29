@@ -40,6 +40,12 @@ regex = "1.12"
 strum = { version = "0.27", features = ["derive"] }
 rayon = "1.11"  # Parallel iteration for parsing
 
+# Expression evaluation (for computed channels)
+meval = "0.2"
+
+# Platform-specific directories
+dirs = "5.0"
+
 # File handling
 rfd = "0.16"  # Native file dialogs
 open = "5"    # Open URLs in default browser
@@ -77,6 +83,10 @@ winresource = "0.1"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = "0.3"
+
+[dev-dependencies]
+# Note: cargo-tarpaulin is installed as a cargo subcommand, not a library dependency
+# Run coverage with: cargo tarpaulin --out Html --exclude-files "src/ui/*" "src/main.rs"
 
 [profile.release]
 opt-level = 3
