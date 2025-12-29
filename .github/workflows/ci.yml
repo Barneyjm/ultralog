@@ -167,6 +167,7 @@ jobs:
         run: cargo test --all-features -- --nocapture
         env:
           LD_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu:${{ github.workspace }}/target/debug/build
+          LD_PRELOAD: /usr/lib/x86_64-linux-gnu/libxml2.so.2
 
   # ============================================
   # Build - Verify release builds work
