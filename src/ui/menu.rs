@@ -41,7 +41,7 @@ impl UltraLogApp {
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter(
                             "Log Files",
-                            &["csv", "log", "txt", "mlg", "llg", "xrk", "drk"],
+                            crate::state::SUPPORTED_EXTENSIONS,
                         )
                         .pick_file()
                     {
