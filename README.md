@@ -54,7 +54,10 @@ A high-performance, cross-platform ECU log viewer written in Rust.
     - ["Chart is slow or laggy"](#chart-is-slow-or-laggy)
     - ["Channels show wrong units"](#channels-show-wrong-units)
     - ["My ECU format isn't supported"](#my-ecu-format-isnt-supported)
-  - [License](#license)
+  - [Legal Notices](#legal-notices)
+    - [License](#license)
+    - [Trademark Disclaimer](#trademark-disclaimer)
+    - [Interoperability Statement](#interoperability-statement)
   - [Author](#author)
   - [Related Projects](#related-projects)
   - [Contributing](#contributing)
@@ -64,13 +67,16 @@ A high-performance, cross-platform ECU log viewer written in Rust.
 
 ## Overview
 
-UltraLog is a desktop application designed for automotive tuners, engineers, and enthusiasts who need to analyze ECU (Engine Control Unit) log data. Built with Rust for maximum performance, it handles large log files (millions of data points) smoothly using advanced downsampling algorithms while maintaining visual accuracy.
+UltraLog is an **independent, open-source** desktop application designed for automotive tuners, engineers, and enthusiasts who need to analyze ECU (Engine Control Unit) log data. Built with Rust for maximum performance, it handles large log files (millions of data points) smoothly using advanced downsampling algorithms while maintaining visual accuracy.
+
+**Purpose:** UltraLog exists to provide **data interoperability** for the automotive tuning community. It reads standard export formats (CSV, binary logs) from various ECU systems, enabling users to analyze their own vehicle telemetry data in a unified, cross-platform tool without vendor lock-in.
 
 **Key Benefits:**
 - **Fast** - Handles massive log files without lag using LTTB downsampling
-- **Universal** - Supports multiple ECU formats in one unified interface
+- **Universal** - Supports multiple ECU formats in one unified interface for cross-platform data analysis
 - **Cross-platform** - Runs natively on Windows, macOS, and Linux
 - **Accessible** - Colorblind-friendly palette and clear visualization
+- **Open** - AGPL-3.0 licensed with documented format specifications for community benefit
 
 ---
 
@@ -573,9 +579,43 @@ UltraLog/
 
 ---
 
-## License
+## Legal Notices
+
+### License
 
 This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE.md) file for details.
+
+### Trademark Disclaimer
+
+UltraLog is an independent, open-source project created for **interoperability purposes** under fair use principles. This software reads data log files exported by various ECU systems to enable users to analyze their own vehicle data.
+
+The following trademarks are the property of their respective owners:
+
+- **Haltech** is a trademark of Haltech Engine Management Systems
+- **ECUMaster** and **EMU Pro** are trademarks of ECUMaster
+- **AiM**, **MXP**, **MXG**, **MXL2**, **EVO5**, and **MyChron5** are trademarks of AiM Technologies
+- **Link ECU** is a trademark of Link Engine Management Ltd
+- **Speeduino** is a trademark of the Speeduino project
+- **rusEFI** is a trademark of the rusEFI project
+- **RomRaider** is a trademark of the RomRaider project
+- **Subaru** is a trademark of Subaru Corporation
+- **MegaSquirt** is a trademark of Bowling and Grippo
+- **AEM** is a trademark of AEM Performance Electronics
+- **MoTeC** is a trademark of MoTeC Pty Ltd
+- **MaxxECU** is a trademark of MaxxECU
+
+**UltraLog is not affiliated with, endorsed by, or sponsored by any of these companies or projects.** All product names, logos, and brands are property of their respective owners and are used solely for identification and interoperability purposes.
+
+### Interoperability Statement
+
+This software is developed under the principles established by [Sega v. Accolade](https://en.wikipedia.org/wiki/Sega_Enterprises,_Ltd._v._Accolade,_Inc.) and similar legal precedents that recognize the legitimacy of reverse engineering for interoperability. UltraLog:
+
+1. **Reads publicly exported data** - Parses CSV, binary, and other log formats that users export from their own ECU software
+2. **Does not circumvent copy protection** - Works only with user-accessible exported data files
+3. **Enables data portability** - Allows users to analyze their vehicle telemetry in a unified, cross-platform tool
+4. **Documents format specifications** - Publishes technical details for community benefit and defensive purposes
+
+For technical format specifications, see [docs/FORMAT_SPECIFICATIONS.md](docs/FORMAT_SPECIFICATIONS.md).
 
 ---
 
