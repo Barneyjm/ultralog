@@ -14,6 +14,7 @@ use std::thread;
 use crate::analysis::{AnalysisResult, AnalyzerRegistry};
 use crate::analytics;
 use crate::computed::{ComputedChannel, ComputedChannelLibrary, FormulaEditorState};
+use crate::ipc::IpcServer;
 use crate::parsers::{
     Aim, EcuMaster, EcuType, Emerald, Haltech, Link, Parseable, RomRaider, Speeduino,
 };
@@ -139,6 +140,9 @@ pub struct UltraLogApp {
     pub(crate) show_analysis_panel: bool,
     /// Selected category in analysis panel (None = show all)
     pub(crate) analysis_selected_category: Option<String>,
+    // === MCP Integration ===
+    /// IPC server for MCP integration (allows Claude to control the app)
+    ipc_server: Option<IpcServer>,
 }
 
 impl Default for UltraLogApp {
@@ -192,6 +196,7 @@ impl Default for UltraLogApp {
             analysis_results: HashMap::new(),
             show_analysis_panel: false,
             analysis_selected_category: None,
+            ipc_server: None,
         }
     }
 }
@@ -231,7 +236,19 @@ impl UltraLogApp {
         // Apply fonts
         cc.egui_ctx.set_fonts(fonts);
 
-        Self::default()
+        // Start the IPC server for MCP integration
+        let mut app = Self::default();
+        match IpcServer::start() {
+            Ok(server) => {
+                tracing::info!("MCP IPC server started on port {}", server.port());
+                app.ipc_server = Some(server);
+            }
+            Err(e) => {
+                tracing::warn!("Failed to start MCP IPC server: {}", e);
+            }
+        }
+
+        app
     }
 
     // ========================================================================
@@ -1351,6 +1368,33 @@ impl UltraLogApp {
             }
         });
     }
+
+    // ========================================================================
+    // MCP Integration
+    // ========================================================================
+
+    /// Process pending IPC commands from the MCP server
+    fn process_ipc_commands(&mut self) {
+        // Collect commands first to avoid borrowing issues
+        let mut pending_commands = Vec::new();
+
+        if let Some(server) = &self.ipc_server {
+            // Collect up to 10 commands per frame to avoid blocking the UI
+            for _ in 0..10 {
+                if let Some(cmd) = server.poll_command() {
+                    pending_commands.push(cmd);
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Now process the collected commands
+        for (command, response_sender) in pending_commands {
+            let response = self.handle_ipc_command(command);
+            let _ = response_sender.send(response);
+        }
+    }
 }
 
 // ============================================================================
@@ -1382,6 +1426,9 @@ impl eframe::App for UltraLogApp {
 
         // Handle keyboard shortcuts
         self.handle_keyboard_shortcuts(ctx);
+
+        // Handle IPC commands from MCP server
+        self.process_ipc_commands();
 
         // Apply dark theme
         ctx.set_visuals(egui::Visuals::dark());

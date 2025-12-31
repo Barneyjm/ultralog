@@ -19,6 +19,10 @@ path = "src/main.rs"
 name = "test_parser"
 path = "src/bin/test_parser.rs"
 
+[[bin]]
+name = "ultralog-mcp"
+path = "src/bin/ultralog_mcp.rs"
+
 [dependencies]
 # GUI Framework
 eframe = { version = "0.33", default-features = false, features = [
@@ -71,6 +75,11 @@ anyhow = "1.0"
 # Logging
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+# MCP Server (Model Context Protocol)
+rmcp = { version = "0.12", features = ["server", "transport-io", "macros"] }
+tokio = { version = "1", features = ["full"] }
+schemars = "1.0"
 
 # UUID generation for anonymous user IDs
 uuid = { version = "1.0", features = ["v4"] }
