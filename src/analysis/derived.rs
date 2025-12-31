@@ -443,7 +443,7 @@ fn compute_volumetric_efficiency(
     rpm: &[f64],
     map: &[f64],
     iat: &[f64],
-    displacement_l: f64,
+    _displacement_l: f64,
     is_iat_kelvin: bool,
 ) -> Vec<f64> {
     // Reference conditions

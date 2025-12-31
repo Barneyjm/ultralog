@@ -2,9 +2,94 @@
 //!
 //! Provides AFR-related analysis including fuel trim drift detection (CUSUM),
 //! rich/lean zone detection, and AFR deviation analysis.
+//!
+//! Supports both AFR and Lambda units with automatic detection.
 
 use super::*;
 use std::collections::HashMap;
+
+// ============================================================================
+// Lambda/AFR unit detection and conversion
+// ============================================================================
+
+/// Stoichiometric AFR for gasoline (14.7:1)
+pub const STOICH_AFR_GASOLINE: f64 = 14.7;
+
+/// Stoichiometric Lambda (always 1.0 by definition)
+pub const STOICH_LAMBDA: f64 = 1.0;
+
+/// Detected fuel mixture unit type
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FuelMixtureUnit {
+    /// Air-Fuel Ratio (typical range 10-20 for gasoline)
+    Afr,
+    /// Lambda (typical range 0.7-1.3, stoich = 1.0)
+    Lambda,
+}
+
+impl FuelMixtureUnit {
+    /// Get the stoichiometric value for this unit type
+    pub fn stoichiometric(&self) -> f64 {
+        match self {
+            FuelMixtureUnit::Afr => STOICH_AFR_GASOLINE,
+            FuelMixtureUnit::Lambda => STOICH_LAMBDA,
+        }
+    }
+
+    /// Get appropriate rich/lean thresholds for this unit type
+    pub fn default_thresholds(&self) -> (f64, f64) {
+        match self {
+            // AFR: ±0.5 from 14.7 (roughly ±3.4%)
+            FuelMixtureUnit::Afr => (0.5, 0.5),
+            // Lambda: ±0.03 from 1.0 (roughly ±3%)
+            FuelMixtureUnit::Lambda => (0.03, 0.03),
+        }
+    }
+
+    /// Convert a value to AFR (for consistent analysis)
+    pub fn to_afr(&self, value: f64) -> f64 {
+        match self {
+            FuelMixtureUnit::Afr => value,
+            FuelMixtureUnit::Lambda => value * STOICH_AFR_GASOLINE,
+        }
+    }
+
+    /// Get unit name for display
+    pub fn unit_name(&self) -> &'static str {
+        match self {
+            FuelMixtureUnit::Afr => "AFR",
+            FuelMixtureUnit::Lambda => "λ",
+        }
+    }
+}
+
+/// Detect whether data is in Lambda or AFR units based on value distribution
+///
+/// Uses the median value to determine unit type:
+/// - Lambda: typically 0.7-1.3 (median around 1.0)
+/// - AFR: typically 10-20 (median around 14.7)
+pub fn detect_fuel_mixture_unit(data: &[f64]) -> FuelMixtureUnit {
+    if data.is_empty() {
+        return FuelMixtureUnit::Afr; // Default assumption
+    }
+
+    // Calculate median for robust detection (less affected by outliers)
+    let mut sorted = data.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let median = if sorted.len() % 2 == 0 {
+        (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) / 2.0
+    } else {
+        sorted[sorted.len() / 2]
+    };
+
+    // Lambda values cluster around 1.0, AFR values cluster around 14.7
+    // Use 3.0 as the threshold (well above Lambda range, well below AFR range)
+    if median < 3.0 {
+        FuelMixtureUnit::Lambda
+    } else {
+        FuelMixtureUnit::Afr
+    }
+}
 
 /// Fuel Trim Drift Analyzer using CUSUM algorithm
 ///
@@ -155,17 +240,21 @@ impl Analyzer for FuelTrimDriftAnalyzer {
 
 /// Rich/Lean Zone Analyzer
 ///
-/// Detects periods where AFR deviates significantly from target,
+/// Detects periods where AFR/Lambda deviates significantly from target,
 /// classifying into rich, lean, and stoichiometric zones.
+/// Automatically detects whether data is in AFR or Lambda units.
 #[derive(Clone)]
 pub struct RichLeanZoneAnalyzer {
-    /// AFR channel to analyze
+    /// AFR/Lambda channel to analyze
     pub channel: String,
-    /// Target AFR (default stoichiometric 14.7)
-    pub target_afr: f64,
+    /// Target value (default: auto-detect based on data)
+    /// Set to 0.0 for auto-detection
+    pub target: f64,
     /// Rich threshold (below target - this value)
+    /// Set to 0.0 for auto-detection based on unit type
     pub rich_threshold: f64,
     /// Lean threshold (above target + this value)
+    /// Set to 0.0 for auto-detection based on unit type
     pub lean_threshold: f64,
 }
 
@@ -173,9 +262,9 @@ impl Default for RichLeanZoneAnalyzer {
     fn default() -> Self {
         Self {
             channel: "AFR".to_string(),
-            target_afr: 14.7,    // Stoichiometric for gasoline
-            rich_threshold: 0.5, // Rich if AFR < 14.2
-            lean_threshold: 0.5, // Lean if AFR > 15.2
+            target: 0.0,         // Auto-detect
+            rich_threshold: 0.0, // Auto-detect
+            lean_threshold: 0.0, // Auto-detect
         }
     }
 }
@@ -190,8 +279,8 @@ impl Analyzer for RichLeanZoneAnalyzer {
     }
 
     fn description(&self) -> &str {
-        "Classifies AFR readings into rich (-1), stoichiometric (0), and lean (+1) zones \
-         based on deviation from target AFR. Also computes time spent in each zone."
+        "Classifies AFR/Lambda readings into rich (-1), stoichiometric (0), and lean (+1) zones \
+         based on deviation from target. Automatically detects AFR vs Lambda units."
     }
 
     fn category(&self) -> &str {
@@ -206,15 +295,31 @@ impl Analyzer for RichLeanZoneAnalyzer {
         let data = require_channel(log, &self.channel)?;
         require_min_length(&data, 10)?;
 
-        let rich_limit = self.target_afr - self.rich_threshold;
-        let lean_limit = self.target_afr + self.lean_threshold;
+        // Auto-detect unit type
+        let unit = detect_fuel_mixture_unit(&data);
+
+        // Use configured values or auto-detect based on unit type
+        let target = if self.target > 0.0 {
+            self.target
+        } else {
+            unit.stoichiometric()
+        };
+
+        let (rich_thresh, lean_thresh) = if self.rich_threshold > 0.0 && self.lean_threshold > 0.0 {
+            (self.rich_threshold, self.lean_threshold)
+        } else {
+            unit.default_thresholds()
+        };
+
+        let rich_limit = target - rich_thresh;
+        let lean_limit = target + lean_thresh;
 
         let (zones, computation_time) = timed_analyze(|| {
             data.iter()
-                .map(|&afr| {
-                    if afr < rich_limit {
+                .map(|&value| {
+                    if value < rich_limit {
                         -1.0 // Rich
-                    } else if afr > lean_limit {
+                    } else if value > lean_limit {
                         1.0 // Lean
                     } else {
                         0.0 // Stoichiometric
@@ -248,6 +353,13 @@ impl Analyzer for RichLeanZoneAnalyzer {
             ));
         }
 
+        // Format limits based on detected unit
+        let precision = if unit == FuelMixtureUnit::Lambda {
+            2
+        } else {
+            1
+        };
+
         Ok(AnalysisResult {
             name: format!("{} Zone", self.channel),
             unit: "zone".to_string(),
@@ -255,9 +367,19 @@ impl Analyzer for RichLeanZoneAnalyzer {
             metadata: AnalysisMetadata {
                 algorithm: "Threshold Classification".to_string(),
                 parameters: vec![
-                    ("target_afr".to_string(), format!("{:.1}", self.target_afr)),
-                    ("rich_limit".to_string(), format!("{:.1}", rich_limit)),
-                    ("lean_limit".to_string(), format!("{:.1}", lean_limit)),
+                    ("detected_unit".to_string(), unit.unit_name().to_string()),
+                    (
+                        "target".to_string(),
+                        format!("{:.prec$}", target, prec = precision),
+                    ),
+                    (
+                        "rich_limit".to_string(),
+                        format!("{:.prec$}", rich_limit, prec = precision),
+                    ),
+                    (
+                        "lean_limit".to_string(),
+                        format!("{:.prec$}", lean_limit, prec = precision),
+                    ),
                     ("rich_pct".to_string(), format!("{:.1}%", rich_pct)),
                     ("stoich_pct".to_string(), format!("{:.1}%", stoich_pct)),
                     ("lean_pct".to_string(), format!("{:.1}%", lean_pct)),
@@ -271,7 +393,7 @@ impl Analyzer for RichLeanZoneAnalyzer {
     fn get_config(&self) -> AnalyzerConfig {
         let mut params = HashMap::new();
         params.insert("channel".to_string(), self.channel.clone());
-        params.insert("target_afr".to_string(), self.target_afr.to_string());
+        params.insert("target".to_string(), self.target.to_string());
         params.insert(
             "rich_threshold".to_string(),
             self.rich_threshold.to_string(),
@@ -292,9 +414,15 @@ impl Analyzer for RichLeanZoneAnalyzer {
         if let Some(ch) = config.parameters.get("channel") {
             self.channel = ch.clone();
         }
+        if let Some(v) = config.parameters.get("target") {
+            if let Ok(val) = v.parse() {
+                self.target = val;
+            }
+        }
+        // Support legacy "target_afr" parameter name
         if let Some(v) = config.parameters.get("target_afr") {
             if let Ok(val) = v.parse() {
-                self.target_afr = val;
+                self.target = val;
             }
         }
         if let Some(v) = config.parameters.get("rich_threshold") {
@@ -314,23 +442,25 @@ impl Analyzer for RichLeanZoneAnalyzer {
     }
 }
 
-/// AFR Deviation Analyzer
+/// AFR/Lambda Deviation Analyzer
 ///
-/// Computes percentage deviation from target AFR, useful for
+/// Computes percentage deviation from target AFR/Lambda, useful for
 /// fuel table correction calculations.
+/// Automatically detects whether data is in AFR or Lambda units.
 #[derive(Clone)]
 pub struct AfrDeviationAnalyzer {
-    /// AFR channel to analyze
+    /// AFR/Lambda channel to analyze
     pub channel: String,
-    /// Target AFR (default stoichiometric 14.7)
-    pub target_afr: f64,
+    /// Target value (default: auto-detect based on data)
+    /// Set to 0.0 for auto-detection
+    pub target: f64,
 }
 
 impl Default for AfrDeviationAnalyzer {
     fn default() -> Self {
         Self {
             channel: "AFR".to_string(),
-            target_afr: 14.7,
+            target: 0.0, // Auto-detect
         }
     }
 }
@@ -341,12 +471,12 @@ impl Analyzer for AfrDeviationAnalyzer {
     }
 
     fn name(&self) -> &str {
-        "AFR Deviation %"
+        "AFR/Lambda Deviation %"
     }
 
     fn description(&self) -> &str {
-        "Computes percentage deviation from target AFR. Positive = lean, negative = rich. \
-         Useful for determining fuel table corrections."
+        "Computes percentage deviation from target AFR/Lambda. Positive = lean, negative = rich. \
+         Automatically detects AFR vs Lambda units. Useful for fuel table corrections."
     }
 
     fn category(&self) -> &str {
@@ -361,15 +491,25 @@ impl Analyzer for AfrDeviationAnalyzer {
         let data = require_channel(log, &self.channel)?;
         require_min_length(&data, 2)?;
 
-        if self.target_afr <= 0.0 {
+        // Auto-detect unit type
+        let unit = detect_fuel_mixture_unit(&data);
+
+        // Use configured target or auto-detect based on unit type
+        let target = if self.target > 0.0 {
+            self.target
+        } else {
+            unit.stoichiometric()
+        };
+
+        if target <= 0.0 {
             return Err(AnalysisError::InvalidParameter(
-                "Target AFR must be positive".to_string(),
+                "Target must be positive".to_string(),
             ));
         }
 
         let (deviations, computation_time) = timed_analyze(|| {
             data.iter()
-                .map(|&afr| ((afr - self.target_afr) / self.target_afr) * 100.0)
+                .map(|&value| ((value - target) / target) * 100.0)
                 .collect::<Vec<f64>>()
         });
 
@@ -388,10 +528,18 @@ impl Analyzer for AfrDeviationAnalyzer {
 
         if stats.stdev > 10.0 {
             warnings.push(format!(
-                "High AFR variability (σ={:.1}%) - check sensor or tune stability",
+                "High {} variability (σ={:.1}%) - check sensor or tune stability",
+                unit.unit_name(),
                 stats.stdev
             ));
         }
+
+        // Format target based on detected unit
+        let precision = if unit == FuelMixtureUnit::Lambda {
+            2
+        } else {
+            1
+        };
 
         Ok(AnalysisResult {
             name: format!("{} Deviation", self.channel),
@@ -400,7 +548,11 @@ impl Analyzer for AfrDeviationAnalyzer {
             metadata: AnalysisMetadata {
                 algorithm: "Percentage Deviation".to_string(),
                 parameters: vec![
-                    ("target_afr".to_string(), format!("{:.1}", self.target_afr)),
+                    ("detected_unit".to_string(), unit.unit_name().to_string()),
+                    (
+                        "target".to_string(),
+                        format!("{:.prec$}", target, prec = precision),
+                    ),
                     ("mean_deviation".to_string(), format!("{:.2}%", stats.mean)),
                     ("stdev".to_string(), format!("{:.2}%", stats.stdev)),
                     ("max_deviation".to_string(), format!("{:.2}%", stats.max)),
@@ -415,7 +567,7 @@ impl Analyzer for AfrDeviationAnalyzer {
     fn get_config(&self) -> AnalyzerConfig {
         let mut params = HashMap::new();
         params.insert("channel".to_string(), self.channel.clone());
-        params.insert("target_afr".to_string(), self.target_afr.to_string());
+        params.insert("target".to_string(), self.target.to_string());
 
         AnalyzerConfig {
             id: self.id().to_string(),
@@ -428,9 +580,15 @@ impl Analyzer for AfrDeviationAnalyzer {
         if let Some(ch) = config.parameters.get("channel") {
             self.channel = ch.clone();
         }
+        if let Some(v) = config.parameters.get("target") {
+            if let Ok(val) = v.parse() {
+                self.target = val;
+            }
+        }
+        // Support legacy "target_afr" parameter name
         if let Some(v) = config.parameters.get("target_afr") {
             if let Ok(val) = v.parse() {
-                self.target_afr = val;
+                self.target = val;
             }
         }
     }
@@ -518,6 +676,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_detect_afr_unit() {
+        // Typical AFR data (around 14.7)
+        let afr_data = vec![14.5, 14.7, 14.9, 15.0, 14.2, 14.8];
+        assert_eq!(detect_fuel_mixture_unit(&afr_data), FuelMixtureUnit::Afr);
+
+        // Wide range AFR data
+        let afr_wide = vec![12.0, 13.5, 14.7, 16.0, 18.0];
+        assert_eq!(detect_fuel_mixture_unit(&afr_wide), FuelMixtureUnit::Afr);
+    }
+
+    #[test]
+    fn test_detect_lambda_unit() {
+        // Typical Lambda data (around 1.0)
+        let lambda_data = vec![0.95, 1.0, 1.02, 0.98, 1.05, 0.97];
+        assert_eq!(
+            detect_fuel_mixture_unit(&lambda_data),
+            FuelMixtureUnit::Lambda
+        );
+
+        // Rich lambda data
+        let lambda_rich = vec![0.75, 0.80, 0.85, 0.90];
+        assert_eq!(
+            detect_fuel_mixture_unit(&lambda_rich),
+            FuelMixtureUnit::Lambda
+        );
+
+        // Lean lambda data
+        let lambda_lean = vec![1.05, 1.10, 1.15, 1.20];
+        assert_eq!(
+            detect_fuel_mixture_unit(&lambda_lean),
+            FuelMixtureUnit::Lambda
+        );
+    }
+
+    #[test]
+    fn test_fuel_mixture_unit_stoichiometric() {
+        assert!((FuelMixtureUnit::Afr.stoichiometric() - 14.7).abs() < 0.01);
+        assert!((FuelMixtureUnit::Lambda.stoichiometric() - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_fuel_mixture_unit_to_afr() {
+        // AFR stays the same
+        assert!((FuelMixtureUnit::Afr.to_afr(14.7) - 14.7).abs() < 0.01);
+
+        // Lambda 1.0 converts to 14.7
+        assert!((FuelMixtureUnit::Lambda.to_afr(1.0) - 14.7).abs() < 0.01);
+
+        // Lambda 0.9 (rich) converts to ~13.2
+        assert!((FuelMixtureUnit::Lambda.to_afr(0.9) - 13.23).abs() < 0.1);
+    }
+
+    #[test]
     fn test_cusum_stable() {
         // Stable data around 0 should not trigger drift
         let data: Vec<f64> = (0..200).map(|_| 0.5).collect();
@@ -540,12 +751,16 @@ mod tests {
     }
 
     #[test]
-    fn test_rich_lean_zones() {
+    fn test_rich_lean_zones_afr() {
+        // Test with AFR data
         let afr_data = vec![14.7, 14.0, 15.5, 14.7, 13.5, 16.0];
+        let unit = detect_fuel_mixture_unit(&afr_data);
+        assert_eq!(unit, FuelMixtureUnit::Afr);
 
-        let analyzer = RichLeanZoneAnalyzer::default();
-        let rich_limit = analyzer.target_afr - analyzer.rich_threshold;
-        let lean_limit = analyzer.target_afr + analyzer.lean_threshold;
+        let (rich_thresh, lean_thresh) = unit.default_thresholds();
+        let target = unit.stoichiometric();
+        let rich_limit = target - rich_thresh;
+        let lean_limit = target + lean_thresh;
 
         // Count expected zones
         let rich = afr_data.iter().filter(|&&a| a < rich_limit).count();
@@ -556,6 +771,26 @@ mod tests {
     }
 
     #[test]
+    fn test_rich_lean_zones_lambda() {
+        // Test with Lambda data
+        let lambda_data = vec![1.0, 0.95, 1.05, 1.0, 0.90, 1.10];
+        let unit = detect_fuel_mixture_unit(&lambda_data);
+        assert_eq!(unit, FuelMixtureUnit::Lambda);
+
+        let (rich_thresh, lean_thresh) = unit.default_thresholds();
+        let target = unit.stoichiometric();
+        let rich_limit = target - rich_thresh;
+        let lean_limit = target + lean_thresh;
+
+        // Count expected zones
+        let rich = lambda_data.iter().filter(|&&a| a < rich_limit).count();
+        let lean = lambda_data.iter().filter(|&&a| a > lean_limit).count();
+
+        assert!(rich > 0, "Should detect rich conditions in lambda data");
+        assert!(lean > 0, "Should detect lean conditions in lambda data");
+    }
+
+    #[test]
     fn test_afr_deviation() {
         let afr_data = vec![14.7, 15.435, 13.965]; // 0%, +5%, -5%
         let target = 14.7;
@@ -563,6 +798,21 @@ mod tests {
         let deviations: Vec<f64> = afr_data
             .iter()
             .map(|&afr| ((afr - target) / target) * 100.0)
+            .collect();
+
+        assert!((deviations[0] - 0.0).abs() < 0.1);
+        assert!((deviations[1] - 5.0).abs() < 0.1);
+        assert!((deviations[2] + 5.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_lambda_deviation() {
+        let lambda_data = vec![1.0, 1.05, 0.95]; // 0%, +5%, -5%
+        let target = 1.0;
+
+        let deviations: Vec<f64> = lambda_data
+            .iter()
+            .map(|&lambda| ((lambda - target) / target) * 100.0)
             .collect();
 
         assert!((deviations[0] - 0.0).abs() < 0.1);

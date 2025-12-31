@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use crate::analysis::{AnalysisResult, Analyzer, AnalyzerConfig, LogDataAccess};
 use crate::app::UltraLogApp;
 use crate::computed::{ComputedChannel, ComputedChannelTemplate};
+use crate::normalize::sort_channels_by_priority;
 use crate::parsers::types::ComputedChannelInfo;
 use crate::parsers::Channel;
 use crate::state::{SelectedChannel, CHART_COLORS};
@@ -34,8 +35,7 @@ struct ParamDef {
 
 #[derive(Clone)]
 enum ParamType {
-    Channel,     // Channel selector dropdown
-    ChannelPair, // Two channel selectors (for correlation)
+    Channel, // Channel selector dropdown
     Integer { min: i32, max: i32 },
     Float { min: f64, max: f64 },
     Boolean,
@@ -103,16 +103,38 @@ impl UltraLogApp {
 
     /// Render the list of available analyzers
     fn render_analyzer_list(&mut self, ui: &mut egui::Ui) {
-        // Get channel names from the currently selected file
-        let channel_names: Vec<String> = if let Some(file_idx) = self.selected_file {
-            if let Some(file) = self.files.get(file_idx) {
-                file.log.channel_names()
+        // Get channel names from the currently selected file, with normalization and sorting
+        let (channel_names, channel_display_names): (Vec<String>, Vec<String>) =
+            if let Some(file_idx) = self.selected_file {
+                if let Some(file) = self.files.get(file_idx) {
+                    let raw_names = file.log.channel_names();
+
+                    // Sort channels like the main sidebar: normalized first, then alphabetically
+                    let sorted = sort_channels_by_priority(
+                        raw_names.len(),
+                        |idx| raw_names.get(idx).cloned().unwrap_or_default(),
+                        self.field_normalization,
+                        Some(&self.custom_normalizations),
+                    );
+
+                    // Build parallel vectors: raw names for matching, display names for UI
+                    let mut raw_sorted = Vec::with_capacity(sorted.len());
+                    let mut display_sorted = Vec::with_capacity(sorted.len());
+
+                    for (idx, display_name, _is_normalized) in sorted {
+                        if let Some(raw_name) = raw_names.get(idx) {
+                            raw_sorted.push(raw_name.clone());
+                            display_sorted.push(display_name);
+                        }
+                    }
+
+                    (raw_sorted, display_sorted)
+                } else {
+                    (vec![], vec![])
+                }
             } else {
-                vec![]
-            }
-        } else {
-            vec![]
-        };
+                (vec![], vec![])
+            };
 
         // Collect analyzer info upfront to avoid borrow issues
         let analyzer_infos: Vec<AnalyzerInfo> = self
@@ -191,9 +213,12 @@ impl UltraLogApp {
                         .default_open(true)
                         .show(ui, |ui| {
                             for info in analyzers {
-                                if let Some((id, action)) =
-                                    Self::render_analyzer_card_with_config(ui, info, &channel_names)
-                                {
+                                if let Some((id, action)) = Self::render_analyzer_card_with_config(
+                                    ui,
+                                    info,
+                                    &channel_names,
+                                    &channel_display_names,
+                                ) {
                                     match action {
                                         AnalyzerAction::Run => {
                                             analyzer_to_run = Some(id);
@@ -252,10 +277,14 @@ impl UltraLogApp {
 
     /// Render a single analyzer card with configuration options
     /// Returns Some((id, action)) if an action was triggered
+    ///
+    /// `channel_names` - raw channel names (for config storage and matching)
+    /// `channel_display_names` - display names (normalized if enabled)
     fn render_analyzer_card_with_config(
         ui: &mut egui::Ui,
         info: &AnalyzerInfo,
         channel_names: &[String],
+        channel_display_names: &[String],
     ) -> Option<(String, AnalyzerAction)> {
         let mut action: Option<AnalyzerAction> = None;
         let mut new_config = info.config.clone();
@@ -264,7 +293,12 @@ impl UltraLogApp {
         let param_defs = get_analyzer_params(&info.id);
 
         // Check if required channels are available
-        let channels_available = check_channels_available(&new_config, &param_defs, channel_names);
+        let channels_available = check_channels_available(
+            &new_config,
+            &param_defs,
+            channel_names,
+            channel_display_names,
+        );
 
         let card_bg = if channels_available {
             egui::Color32::from_rgb(40, 45, 40)
@@ -346,24 +380,68 @@ impl UltraLogApp {
 
                         match &param.param_type {
                             ParamType::Channel => {
-                                let current = new_config
+                                let config_value = new_config
                                     .parameters
                                     .get(&param.key)
                                     .cloned()
                                     .unwrap_or_default();
 
+                                // Resolve config value to raw channel name
+                                // Config might have a normalized name (e.g., "AFR") that needs
+                                // to be resolved to the actual raw name (e.g., "Wideband O2 Overall")
+                                let (current_raw, current_display) = if let Some(idx) =
+                                    channel_names
+                                        .iter()
+                                        .position(|n| n.eq_ignore_ascii_case(&config_value))
+                                {
+                                    // Config value matches a raw name directly
+                                    (
+                                        channel_names[idx].clone(),
+                                        channel_display_names
+                                            .get(idx)
+                                            .cloned()
+                                            .unwrap_or(config_value.clone()),
+                                    )
+                                } else if let Some(idx) = channel_display_names
+                                    .iter()
+                                    .position(|n| n.eq_ignore_ascii_case(&config_value))
+                                {
+                                    // Config value matches a display/normalized name - resolve to raw
+                                    let raw = channel_names
+                                        .get(idx)
+                                        .cloned()
+                                        .unwrap_or(config_value.clone());
+                                    let display = channel_display_names[idx].clone();
+                                    // Auto-update config to use the raw name
+                                    new_config.parameters.insert(param.key.clone(), raw.clone());
+                                    config_changed = true;
+                                    (raw, display)
+                                } else {
+                                    // No match found, keep as-is
+                                    (config_value.clone(), config_value)
+                                };
+
                                 let combo_response = egui::ComboBox::from_id_salt(format!(
                                     "{}_{}_combo",
                                     info.id, param.key
                                 ))
-                                .width(140.0)
-                                .selected_text(&current)
+                                .width(180.0)
+                                .selected_text(&current_display)
                                 .show_ui(ui, |ui| {
-                                    for ch in channel_names {
-                                        if ui.selectable_label(current == *ch, ch).clicked() {
+                                    // Show display names but store raw names
+                                    for (raw_name, display_name) in
+                                        channel_names.iter().zip(channel_display_names.iter())
+                                    {
+                                        if ui
+                                            .selectable_label(
+                                                current_raw == *raw_name,
+                                                display_name,
+                                            )
+                                            .clicked()
+                                        {
                                             new_config
                                                 .parameters
-                                                .insert(param.key.clone(), ch.clone());
+                                                .insert(param.key.clone(), raw_name.clone());
                                             config_changed = true;
                                         }
                                     }
@@ -373,9 +451,6 @@ impl UltraLogApp {
                                 if let Some(tooltip) = &param.tooltip {
                                     combo_response.response.on_hover_text(tooltip);
                                 }
-                            }
-                            ParamType::ChannelPair => {
-                                // This is handled by two separate Channel params
                             }
                             ParamType::Integer { min, max } => {
                                 let current: i32 = new_config
@@ -869,41 +944,41 @@ fn get_analyzer_params(analyzer_id: &str) -> Vec<ParamDef> {
         "rich_lean_zone" => vec![
             ParamDef {
                 key: "channel".to_string(),
-                label: "AFR Channel:".to_string(),
+                label: "AFR/Lambda:".to_string(),
                 param_type: ParamType::Channel,
-                tooltip: Some("Air-Fuel Ratio channel. Common names: AFR, O2, Lambda, Wideband, A/F Ratio, AFR1".to_string()),
+                tooltip: Some("AFR or Lambda channel. Auto-detects unit type. Common: AFR, Lambda, Wideband O2, O2".to_string()),
             },
             ParamDef {
-                key: "target_afr".to_string(),
-                label: "Target AFR:".to_string(),
-                param_type: ParamType::Float { min: 8.0, max: 20.0 },
-                tooltip: Some("Stoichiometric AFR. Gasoline: 14.7, E85: 9.8, Methanol: 6.4".to_string()),
+                key: "target".to_string(),
+                label: "Target:".to_string(),
+                param_type: ParamType::Float { min: 0.0, max: 20.0 },
+                tooltip: Some("Target value. Set to 0 for auto-detect (AFR: 14.7, Lambda: 1.0). Or set manually.".to_string()),
             },
             ParamDef {
                 key: "rich_threshold".to_string(),
                 label: "Rich threshold:".to_string(),
-                param_type: ParamType::Float { min: 0.1, max: 3.0 },
-                tooltip: Some("AFR below (target - this) is rich. Default 0.5".to_string()),
+                param_type: ParamType::Float { min: 0.0, max: 3.0 },
+                tooltip: Some("Set to 0 for auto-detect (AFR: 0.5, Lambda: 0.03). Rich = below (target - threshold)".to_string()),
             },
             ParamDef {
                 key: "lean_threshold".to_string(),
                 label: "Lean threshold:".to_string(),
-                param_type: ParamType::Float { min: 0.1, max: 3.0 },
-                tooltip: Some("AFR above (target + this) is lean. Default 0.5".to_string()),
+                param_type: ParamType::Float { min: 0.0, max: 3.0 },
+                tooltip: Some("Set to 0 for auto-detect (AFR: 0.5, Lambda: 0.03). Lean = above (target + threshold)".to_string()),
             },
         ],
         "afr_deviation" => vec![
             ParamDef {
                 key: "channel".to_string(),
-                label: "AFR Channel:".to_string(),
+                label: "AFR/Lambda:".to_string(),
                 param_type: ParamType::Channel,
-                tooltip: Some("Air-Fuel Ratio channel. Common names: AFR, O2, Lambda, Wideband, A/F Ratio".to_string()),
+                tooltip: Some("AFR or Lambda channel. Auto-detects unit type. Common: AFR, Lambda, Wideband O2, O2".to_string()),
             },
             ParamDef {
-                key: "target_afr".to_string(),
-                label: "Target AFR:".to_string(),
-                param_type: ParamType::Float { min: 8.0, max: 20.0 },
-                tooltip: Some("Target AFR for deviation calculation. Gasoline stoich: 14.7".to_string()),
+                key: "target".to_string(),
+                label: "Target:".to_string(),
+                param_type: ParamType::Float { min: 0.0, max: 20.0 },
+                tooltip: Some("Target value. Set to 0 for auto-detect (AFR: 14.7, Lambda: 1.0). Or set manually.".to_string()),
             },
         ],
 
@@ -974,20 +1049,31 @@ fn get_analyzer_params(analyzer_id: &str) -> Vec<ParamDef> {
 }
 
 /// Check if required channels are available in the log
+///
+/// Checks both raw channel names and normalized display names to handle
+/// cases where analyzer defaults (e.g., "AFR") need to match normalized names
+/// (e.g., "Wideband O2 Overall" -> "AFR")
 fn check_channels_available(
     config: &AnalyzerConfig,
     param_defs: &[ParamDef],
     channel_names: &[String],
+    channel_display_names: &[String],
 ) -> bool {
     for param in param_defs {
         if matches!(param.param_type, ParamType::Channel) {
             if let Some(ch) = config.parameters.get(&param.key) {
-                if !ch.is_empty()
-                    && !channel_names
+                if !ch.is_empty() {
+                    // Check if configured channel matches raw name OR display name
+                    let found_in_raw = channel_names
                         .iter()
-                        .any(|name| name.eq_ignore_ascii_case(ch))
-                {
-                    return false;
+                        .any(|name| name.eq_ignore_ascii_case(ch));
+                    let found_in_display = channel_display_names
+                        .iter()
+                        .any(|name| name.eq_ignore_ascii_case(ch));
+
+                    if !found_in_raw && !found_in_display {
+                        return false;
+                    }
                 }
             }
         }

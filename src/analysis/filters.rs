@@ -848,6 +848,7 @@ fn butterworth_highpass_sos(cutoff: f64, order: usize) -> Vec<Sos> {
 }
 
 /// Apply a cascade of SOS sections to data
+#[allow(dead_code)]
 fn sos_filter(data: &[f64], sos: &[Sos], zi: Option<&[[f64; 2]]>) -> Vec<f64> {
     if data.is_empty() || sos.is_empty() {
         return data.to_vec();
