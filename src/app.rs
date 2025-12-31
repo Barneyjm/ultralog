@@ -15,6 +15,7 @@ use crate::analysis::{AnalysisResult, AnalyzerRegistry};
 use crate::analytics;
 use crate::computed::{ComputedChannel, ComputedChannelLibrary, FormulaEditorState};
 use crate::ipc::IpcServer;
+use crate::mcp::{start_mcp_server, McpServerHandle, DEFAULT_MCP_PORT};
 use crate::parsers::{
     Aim, EcuMaster, EcuType, Emerald, Haltech, Link, Parseable, RomRaider, Speeduino,
 };
@@ -143,6 +144,8 @@ pub struct UltraLogApp {
     // === MCP Integration ===
     /// IPC server for MCP integration (allows Claude to control the app)
     ipc_server: Option<IpcServer>,
+    /// MCP HTTP server handle (embedded server for Claude Desktop connection)
+    mcp_server: Option<McpServerHandle>,
 }
 
 impl Default for UltraLogApp {
@@ -197,6 +200,7 @@ impl Default for UltraLogApp {
             show_analysis_panel: false,
             analysis_selected_category: None,
             ipc_server: None,
+            mcp_server: None,
         }
     }
 }
@@ -238,13 +242,32 @@ impl UltraLogApp {
 
         // Start the IPC server for MCP integration
         let mut app = Self::default();
+        let mut ipc_port = crate::ipc::DEFAULT_IPC_PORT;
         match IpcServer::start() {
             Ok(server) => {
-                tracing::info!("MCP IPC server started on port {}", server.port());
+                ipc_port = server.port();
+                tracing::info!("MCP IPC server started on port {}", ipc_port);
                 app.ipc_server = Some(server);
             }
             Err(e) => {
                 tracing::warn!("Failed to start MCP IPC server: {}", e);
+            }
+        }
+
+        // Start the MCP HTTP server (embedded, for Claude Desktop connection)
+        if app.ipc_server.is_some() {
+            match start_mcp_server(DEFAULT_MCP_PORT, ipc_port) {
+                Ok(handle) => {
+                    tracing::info!(
+                        "MCP HTTP server started at {} (port {} = 5-2-4-5-3, I5 firing order tribute)",
+                        handle.url(),
+                        handle.port()
+                    );
+                    app.mcp_server = Some(handle);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to start MCP HTTP server: {}", e);
+                }
             }
         }
 

@@ -33,7 +33,10 @@ impl GuiClient {
 
     /// Connect to the GUI if not already connected
     fn ensure_connected(&self) -> Result<(), String> {
-        let mut stream = self.stream.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let mut stream = self
+            .stream
+            .lock()
+            .map_err(|e| format!("Lock error: {}", e))?;
 
         if stream.is_some() {
             return Ok(());
@@ -58,7 +61,10 @@ impl GuiClient {
     pub fn send_command(&self, command: IpcCommand) -> Result<IpcResponse, String> {
         self.ensure_connected()?;
 
-        let mut stream_guard = self.stream.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let mut stream_guard = self
+            .stream
+            .lock()
+            .map_err(|e| format!("Lock error: {}", e))?;
 
         // Take the stream out temporarily
         let mut stream = stream_guard
@@ -79,7 +85,11 @@ impl GuiClient {
         }
 
         // Read the response
-        let mut reader = BufReader::new(stream.try_clone().map_err(|e| format!("Clone error: {}", e))?);
+        let mut reader = BufReader::new(
+            stream
+                .try_clone()
+                .map_err(|e| format!("Clone error: {}", e))?,
+        );
         let mut response_line = String::new();
 
         if let Err(e) = reader.read_line(&mut response_line) {
@@ -90,16 +100,12 @@ impl GuiClient {
         *stream_guard = Some(stream);
 
         // Parse the response
-        serde_json::from_str(&response_line)
-            .map_err(|e| format!("Failed to parse response: {}", e))
+        serde_json::from_str(&response_line).map_err(|e| format!("Failed to parse response: {}", e))
     }
 
     /// Check if the GUI is running and responsive
     pub fn ping(&self) -> bool {
-        match self.send_command(IpcCommand::Ping) {
-            Ok(IpcResponse::Ok(_)) => true,
-            _ => false,
-        }
+        matches!(self.send_command(IpcCommand::Ping), Ok(IpcResponse::Ok(_)))
     }
 
     /// Disconnect from the GUI

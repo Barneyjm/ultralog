@@ -7,7 +7,7 @@ pub mod commands;
 pub mod handler;
 pub mod server;
 
-pub use commands::{IpcCommand, IpcResponse, ChannelStats, FileInfo, ChannelInfo};
+pub use commands::{ChannelInfo, ChannelStats, FileInfo, IpcCommand, IpcResponse};
 pub use server::IpcServer;
 
 /// Default port for the IPC server

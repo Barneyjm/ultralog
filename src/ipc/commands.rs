@@ -149,10 +149,7 @@ pub enum ResponseData {
     Channels(Vec<ChannelInfo>),
 
     /// Channel time series data
-    ChannelData {
-        times: Vec<f64>,
-        values: Vec<f64>,
-    },
+    ChannelData { times: Vec<f64>, values: Vec<f64> },
 
     /// Channel statistics
     Stats(ChannelStats),

@@ -267,7 +267,10 @@ impl UltraLogApp {
         } else {
             // Check computed channels
             if let Some(computed) = self.file_computed_channels.get(&file_idx) {
-                if let Some(c) = computed.iter().find(|c| c.name().eq_ignore_ascii_case(channel_name)) {
+                if let Some(c) = computed
+                    .iter()
+                    .find(|c| c.name().eq_ignore_ascii_case(channel_name))
+                {
                     if let Some(data) = &c.cached_data {
                         let all_times = file.log.get_times_as_f64().to_vec();
                         self.filter_by_time_range(all_times, data.clone(), time_range)
@@ -339,7 +342,10 @@ impl UltraLogApp {
         } else {
             // Check computed channels
             if let Some(computed) = self.file_computed_channels.get(&file_idx) {
-                if let Some(comp_idx) = computed.iter().position(|c| c.name().eq_ignore_ascii_case(channel_name)) {
+                if let Some(comp_idx) = computed
+                    .iter()
+                    .position(|c| c.name().eq_ignore_ascii_case(channel_name))
+                {
                     let channel_idx = file.log.channels.len() + comp_idx;
                     self.add_channel(file_idx, channel_idx);
                     IpcResponse::ok()
@@ -462,7 +468,10 @@ impl UltraLogApp {
         if let Some(tab_idx) = self.active_tab {
             let file_idx = self.tabs[tab_idx].file_index;
             if let Some(computed) = self.file_computed_channels.get_mut(&file_idx) {
-                if let Some(pos) = computed.iter().position(|c| c.name().eq_ignore_ascii_case(name)) {
+                if let Some(pos) = computed
+                    .iter()
+                    .position(|c| c.name().eq_ignore_ascii_case(name))
+                {
                     computed.remove(pos);
                 }
             }
@@ -500,8 +509,7 @@ impl UltraLogApp {
         };
 
         let file = &self.files[file_idx];
-        let available_channels: Vec<String> =
-            file.log.channels.iter().map(|c| c.name()).collect();
+        let available_channels: Vec<String> = file.log.channels.iter().map(|c| c.name()).collect();
 
         // Validate formula
         if let Err(e) = expression::validate_formula(formula, &available_channels) {
@@ -779,13 +787,12 @@ impl UltraLogApp {
 
         let mean = sum / values.len() as f64;
 
-        let variance =
-            values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
         let std_dev = variance.sqrt();
 
         let mut sorted = values.to_vec();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let median = if sorted.len() % 2 == 0 {
+        let median = if sorted.len().is_multiple_of(2) {
             (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) / 2.0
         } else {
             sorted[sorted.len() / 2]
